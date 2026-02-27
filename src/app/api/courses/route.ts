@@ -27,6 +27,11 @@ export const GET = withAuth(
         filter.coach = currentUserId;
       }
 
+      // Staff: only courses they are enrolled in
+      if (currentRole === 'staff') {
+        filter.assignedStaff = currentUserId;
+      }
+
       // Domain filter
       const domain = searchParams.get('domain');
       if (domain) filter.domain = domain;
@@ -81,7 +86,7 @@ export const GET = withAuth(
       return errorResponse('Internal server error', 500);
     }
   },
-  ['admin', 'manager', 'coach']
+  ['admin', 'manager', 'coach', 'staff']
 );
 
 // POST /api/courses

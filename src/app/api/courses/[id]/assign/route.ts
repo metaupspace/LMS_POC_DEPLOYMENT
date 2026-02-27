@@ -3,6 +3,7 @@ import { connectDB } from '@/lib/db/connect';
 import Course from '@/lib/db/models/Course';
 import Module from '@/lib/db/models/Module';
 import LearnerProgress from '@/lib/db/models/LearnerProgress';
+import Gamification from '@/lib/db/models/Gamification';
 import { withAuth } from '@/lib/auth/rbac';
 import { assignCourseSchema } from '@/lib/validators/course';
 import { successResponse, errorResponse } from '@/lib/utils/apiResponse';
@@ -75,6 +76,20 @@ export const POST = withAuth(
           if (progressRecords.length > 0) {
             await LearnerProgress.insertMany(progressRecords, { ordered: false }).catch(() => {
               // Ignore duplicate key errors for already-existing progress records
+            });
+          }
+
+          // Create Gamification records for newly assigned staff (if not existing)
+          const gamificationRecords = newStaffIds.map((staffId) => ({
+            user: staffId,
+            totalPoints: 0,
+            badges: [],
+            streak: { current: 0, longest: 0 },
+          }));
+
+          if (gamificationRecords.length > 0) {
+            await Gamification.insertMany(gamificationRecords, { ordered: false }).catch(() => {
+              // Ignore duplicate key errors for already-existing gamification records
             });
           }
 

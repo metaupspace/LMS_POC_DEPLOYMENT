@@ -660,7 +660,7 @@ export default function CourseDetailPage() {
               {/* Coach info */}
               {course.coach && (
                 <p className="mt-sm text-body-md text-text-secondary">
-                  Coach ID: {course.coach}
+                  Coach: {typeof course.coach === 'object' ? course.coach.name : course.coach}
                 </p>
               )}
 

@@ -3,8 +3,67 @@ import { connectDB } from '@/lib/db/connect';
 import Module from '@/lib/db/models/Module';
 import Course from '@/lib/db/models/Course';
 import { withAuth } from '@/lib/auth/rbac';
-import { successResponse, errorResponse } from '@/lib/utils/apiResponse';
+import { successResponse, errorResponse, paginatedResponse } from '@/lib/utils/apiResponse';
+import { getPaginationParams, buildPaginationMeta } from '@/lib/utils/pagination';
 import { z } from 'zod';
+import type { FilterQuery } from 'mongoose';
+
+// GET /api/modules
+export const GET = withAuth(
+  async (request: NextRequest) => {
+    try {
+      await connectDB();
+
+      const { searchParams } = new URL(request.url);
+      const { page, limit } = getPaginationParams(searchParams);
+      const currentRole = request.headers.get('x-user-role');
+      const currentUserId = request.headers.get('x-user-id');
+
+      const filter: FilterQuery<Record<string, unknown>> = {};
+
+      // Filter by course if provided
+      const courseId = searchParams.get('course');
+      if (courseId) filter.course = courseId;
+
+      // Staff: only modules from courses they are enrolled in
+      if (currentRole === 'staff') {
+        const staffCourses = await Course.find({ assignedStaff: currentUserId })
+          .select('_id')
+          .lean();
+        const courseIds = staffCourses.map((c) => c._id);
+        filter.course = courseId ? courseId : { $in: courseIds };
+      }
+
+      // Coach: only modules from their assigned courses
+      if (currentRole === 'coach') {
+        const coachCourses = await Course.find({ coach: currentUserId })
+          .select('_id')
+          .lean();
+        const courseIds = coachCourses.map((c) => c._id);
+        filter.course = courseId ? courseId : { $in: courseIds };
+      }
+
+      const skip = (page - 1) * limit;
+
+      const [modules, total] = await Promise.all([
+        Module.find(filter)
+          .populate('quiz')
+          .sort({ course: 1, order: 1 })
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+        Module.countDocuments(filter),
+      ]);
+
+      const pagination = buildPaginationMeta(total, page, limit);
+      return paginatedResponse(modules, pagination, 'Modules retrieved successfully');
+    } catch (err) {
+      console.error('[Modules/GET] Error:', err instanceof Error ? err.message : err);
+      return errorResponse('Internal server error', 500);
+    }
+  },
+  ['admin', 'manager', 'coach', 'staff']
+);
 
 const createModuleSchema = z.object({
   title: z.string().trim().min(1, 'Title is required').max(200),

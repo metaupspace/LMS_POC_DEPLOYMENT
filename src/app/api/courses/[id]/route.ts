@@ -35,13 +35,24 @@ export const GET = withAuth(
         return errorResponse('Insufficient permissions', 403);
       }
 
+      // Staff can only view courses they are enrolled in
+      if (currentRole === 'staff') {
+        const isEnrolled = course.assignedStaff?.some(
+          (s: { _id?: { toString(): string }; toString(): string }) =>
+            (s._id ? s._id.toString() : s.toString()) === currentUserId
+        );
+        if (!isEnrolled) {
+          return errorResponse('Insufficient permissions', 403);
+        }
+      }
+
       return successResponse(course, 'Course retrieved successfully');
     } catch (err) {
       console.error('[Courses/GET/:id] Error:', err instanceof Error ? err.message : err);
       return errorResponse('Internal server error', 500);
     }
   },
-  ['admin', 'manager', 'coach']
+  ['admin', 'manager', 'coach', 'staff']
 );
 
 // PATCH /api/courses/[id]

@@ -36,14 +36,28 @@ export const POST = withAuth(
         return errorResponse('Associated module not found', 404);
       }
 
-      // Find learner progress
-      const progress = await LearnerProgress.findOne({
+      // Find learner progress (auto-create if missing)
+      let progress = await LearnerProgress.findOne({
         user: currentUserId,
         module: quiz.module,
       });
 
       if (!progress) {
-        return errorResponse('No progress record found. Is this course assigned to you?', 404);
+        // Auto-create progress record
+        progress = new LearnerProgress({
+          user: currentUserId,
+          course: moduleDoc.course,
+          module: quiz.module,
+          status: 'not_started',
+          completedContents: [],
+          videoCompleted: false,
+          videoPoints: 0,
+          quizAttempts: [],
+          quizPassed: false,
+          quizPoints: 0,
+          proofOfWorkPoints: 0,
+          totalModulePoints: 0,
+        });
       }
 
       // Check if already passed
@@ -91,8 +105,16 @@ export const POST = withAuth(
         progress.quizPoints = POINTS.QUIZ_PASS;
         pointsEarned = POINTS.QUIZ_PASS;
 
-        // Check if module is complete (video + quiz done)
-        if (progress.videoCompleted) {
+        // Check if module is complete (content + quiz done)
+        // Check both the flag and actual completedContents in case flag wasn't set
+        const totalContents = moduleDoc.contents?.length ?? 0;
+        const allContentsDone =
+          progress.videoCompleted ||
+          (totalContents > 0 && progress.completedContents.length >= totalContents);
+
+        if (allContentsDone) {
+          progress.videoCompleted = true;
+          progress.videoPoints = progress.videoPoints || POINTS.VIDEO_COMPLETION;
           progress.status = 'completed';
           progress.completedAt = new Date();
         } else {
@@ -101,61 +123,68 @@ export const POST = withAuth(
 
         progress.totalModulePoints = progress.videoPoints + progress.quizPoints + progress.proofOfWorkPoints;
 
-        // Update Gamification
-        const gamification = await Gamification.findOne({ user: currentUserId });
-        if (gamification) {
-          gamification.totalPoints += pointsEarned;
+        // Update Gamification (auto-create if missing)
+        let gamification = await Gamification.findOne({ user: currentUserId });
+        if (!gamification) {
+          gamification = new Gamification({
+            user: currentUserId,
+            totalPoints: 0,
+            badges: [],
+            streak: { current: 0, longest: 0 },
+          });
+        }
 
-          // Check badge thresholds
-          for (const tier of BADGE_TIERS) {
-            const alreadyHas = gamification.badges.some((b) => b.name === tier.name);
-            if (!alreadyHas && gamification.totalPoints >= tier.threshold) {
-              gamification.badges.push({
-                name: tier.name,
-                threshold: tier.threshold,
-                earnedAt: new Date(),
-                icon: tier.icon,
-              });
+        gamification.totalPoints += pointsEarned;
 
-              // Publish badge notification
-              await publishToQueue(QUEUE_NAMES.NOTIFICATION, {
-                type: 'badge_earned',
-                payload: {
-                  userId: currentUserId,
-                  badgeName: tier.name,
-                  badgeIcon: tier.icon,
-                },
-                timestamp: new Date().toISOString(),
-              }).catch(() => {});
-            }
+        // Check badge thresholds
+        for (const tier of BADGE_TIERS) {
+          const alreadyHas = gamification.badges.some((b) => b.name === tier.name);
+          if (!alreadyHas && gamification.totalPoints >= tier.threshold) {
+            gamification.badges.push({
+              name: tier.name,
+              threshold: tier.threshold,
+              earnedAt: new Date(),
+              icon: tier.icon,
+            });
+
+            // Publish badge notification
+            await publishToQueue(QUEUE_NAMES.NOTIFICATION, {
+              type: 'badge_earned',
+              payload: {
+                userId: currentUserId,
+                badgeName: tier.name,
+                badgeIcon: tier.icon,
+              },
+              timestamp: new Date().toISOString(),
+            }).catch(() => {});
           }
+        }
 
-          // Update streak
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const lastActivity = gamification.streak.lastActivityDate;
+        // Update streak
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const lastActivity = gamification.streak.lastActivityDate;
 
-          if (lastActivity) {
-            const lastDate = new Date(lastActivity);
-            lastDate.setHours(0, 0, 0, 0);
-            const diffDays = Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (lastActivity) {
+          const lastDate = new Date(lastActivity);
+          lastDate.setHours(0, 0, 0, 0);
+          const diffDays = Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
 
-            if (diffDays === 1) {
-              gamification.streak.current += 1;
-            } else if (diffDays > 1) {
-              gamification.streak.current = 1;
-            }
-          } else {
+          if (diffDays === 1) {
+            gamification.streak.current += 1;
+          } else if (diffDays > 1) {
             gamification.streak.current = 1;
           }
-
-          if (gamification.streak.current > gamification.streak.longest) {
-            gamification.streak.longest = gamification.streak.current;
-          }
-          gamification.streak.lastActivityDate = new Date();
-
-          await gamification.save();
+        } else {
+          gamification.streak.current = 1;
         }
+
+        if (gamification.streak.current > gamification.streak.longest) {
+          gamification.streak.longest = gamification.streak.current;
+        }
+        gamification.streak.lastActivityDate = new Date();
+
+        await gamification.save();
       } else {
         if (progress.status === 'not_started') {
           progress.status = 'in_progress';

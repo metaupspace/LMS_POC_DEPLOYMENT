@@ -232,7 +232,9 @@ export default function CreateCoursePage() {
       });
       setAssignment((prev) => ({
         ...prev,
-        coachId: c.coach || '',
+        coachId: c.coach
+          ? typeof c.coach === 'object' ? c.coach._id : c.coach
+          : '',
       }));
       setEditLoaded(true);
     }
@@ -635,67 +637,94 @@ export default function CreateCoursePage() {
             passingThreshold: courseData.passingThreshold,
             status: publish ? 'active' : 'draft',
           }).unwrap();
-          courseId = courseResult.data?._id ?? '';
+          // POST returns toJSON() which renames _id → id; GET .lean() keeps _id
+          const resData = courseResult.data as unknown as Record<string, unknown> | undefined;
+          courseId = (resData?._id ?? resData?.id ?? '') as string;
           if (!courseId) throw new Error('Course creation failed');
         }
 
-        // 2. Create modules
+        // 2. Create modules (track partial failures)
+        const moduleErrors: string[] = [];
         for (const mod of modules) {
-          const moduleResult = await createModule({
-            title: mod.title,
-            description: mod.description,
-            course: courseId,
-            order: mod.order,
-            contents: mod.contents.map((c) => ({
-              type: c.type,
-              title: c.title,
-              data: c.data,
-              duration: c.duration,
-              downloadable: false,
-            })),
-          }).unwrap();
-
-          const moduleId = moduleResult.data?._id;
-
-          // 3. Create quiz for this module if exists
-          if (mod.quiz && mod.quiz.questions.length > 0 && moduleId) {
-            await createQuiz({
-              module: moduleId,
-              questions: mod.quiz.questions.map((q) => ({
-                questionText: q.questionText,
-                questionImage: '',
-                options: q.options.map((o) => ({
-                  text: o.text,
-                  image: '',
-                  isCorrect: o.isCorrect,
-                })),
-                points: q.points,
+          try {
+            const moduleResult = await createModule({
+              title: mod.title,
+              description: mod.description,
+              courseId,
+              order: mod.order,
+              contents: mod.contents.map((c) => ({
+                type: c.type,
+                title: c.title,
+                data: c.data,
+                duration: c.duration,
+                downloadable: false,
               })),
-              passingScore: mod.quiz.passingScore,
-              maxAttempts: mod.quiz.maxAttempts,
             }).unwrap();
+
+            // POST returns toJSON() which renames _id → id
+            const modResData = moduleResult.data as unknown as Record<string, unknown> | undefined;
+            const moduleId = (modResData?._id ?? modResData?.id ?? '') as string;
+
+            // 3. Create quiz for this module if exists
+            if (mod.quiz && mod.quiz.questions.length > 0 && moduleId) {
+              try {
+                await createQuiz({
+                  module: moduleId,
+                  questions: mod.quiz.questions.map((q) => ({
+                    questionText: q.questionText,
+                    questionImage: '',
+                    options: q.options.map((o) => ({
+                      text: o.text,
+                      image: '',
+                      isCorrect: o.isCorrect,
+                    })),
+                    points: q.points,
+                  })),
+                  passingScore: mod.quiz.passingScore,
+                  maxAttempts: mod.quiz.maxAttempts,
+                }).unwrap();
+              } catch (quizErr) {
+                moduleErrors.push(`Quiz for "${mod.title}": ${getErrorMessage(quizErr)}`);
+              }
+            }
+          } catch (modErr) {
+            moduleErrors.push(`Module "${mod.title}": ${getErrorMessage(modErr)}`);
           }
         }
 
         // 4. Assign staff if selected
-        if (assignment.staffIds.length > 0) {
-          await assignCourse({
-            id: courseId,
-            body: { staffIds: assignment.staffIds },
-          }).unwrap();
+        try {
+          if (assignment.staffIds.length > 0) {
+            await assignCourse({
+              id: courseId,
+              body: { staffIds: assignment.staffIds },
+            }).unwrap();
+          }
+        } catch (assignErr) {
+          moduleErrors.push(`Staff assignment: ${getErrorMessage(assignErr)}`);
         }
 
-        dispatch(
-          addToast({
-            type: 'success',
-            message: isEditMode
-              ? 'Course updated successfully!'
-              : publish
-                ? 'Course published successfully!'
-                : 'Course saved as draft.',
-            duration: 4000,
-          })
-        );
+        if (moduleErrors.length > 0) {
+          dispatch(
+            addToast({
+              type: 'warning',
+              message: `Course saved but some items failed: ${moduleErrors[0]}`,
+              duration: 6000,
+            })
+          );
+        } else {
+          dispatch(
+            addToast({
+              type: 'success',
+              message: isEditMode
+                ? 'Course updated successfully!'
+                : publish
+                  ? 'Course published successfully!'
+                  : 'Course saved as draft.',
+              duration: 4000,
+            })
+          );
+        }
         router.push('/admin/courses');
       } catch (err) {
         dispatch(

@@ -34,7 +34,7 @@ export interface GetModulesParams {
 export interface CreateModuleBody {
   title: string;
   description: string;
-  course: string;
+  courseId: string;
   order?: number;
   contents?: ModuleContentData[];
 }
@@ -75,34 +75,49 @@ export const moduleApi = baseApi.injectEndpoints({
         method: 'POST',
         body,
       }),
-      invalidatesTags: (_result, _error, { course }) => [
+      invalidatesTags: (_result, _error, { courseId }) => [
         { type: 'Module', id: 'LIST' },
-        { type: 'Module', id: `COURSE_${course}` },
-        { type: 'Course', id: course },
+        { type: 'Module', id: `COURSE_${courseId}` },
+        { type: 'Course', id: courseId },
       ],
     }),
 
-    updateModule: builder.mutation<ApiResponse<ModuleData>, { id: string; body: UpdateModuleBody }>({
+    updateModule: builder.mutation<ApiResponse<ModuleData>, { id: string; body: UpdateModuleBody; courseId?: string }>({
       query: ({ id, body }) => ({
         url: `/modules/${id}`,
         method: 'PATCH',
         body,
       }),
-      invalidatesTags: (_result, _error, { id }) => [
-        { type: 'Module', id },
-        { type: 'Module', id: 'LIST' },
-      ],
+      invalidatesTags: (_result, _error, { id, courseId }) => {
+        const tags: { type: 'Module' | 'Course'; id: string }[] = [
+          { type: 'Module', id },
+          { type: 'Module', id: 'LIST' },
+        ];
+        if (courseId) {
+          tags.push({ type: 'Module', id: `COURSE_${courseId}` });
+        }
+        return tags;
+      },
     }),
 
-    deleteModule: builder.mutation<ApiResponse<null>, string>({
-      query: (id) => ({
-        url: `/modules/${id}`,
+    deleteModule: builder.mutation<ApiResponse<null>, { id: string; courseId?: string } | string>({
+      query: (arg) => ({
+        url: `/modules/${typeof arg === 'string' ? arg : arg.id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: (_result, _error, id) => [
-        { type: 'Module', id },
-        { type: 'Module', id: 'LIST' },
-      ],
+      invalidatesTags: (_result, _error, arg) => {
+        const id = typeof arg === 'string' ? arg : arg.id;
+        const courseId = typeof arg === 'string' ? undefined : arg.courseId;
+        const tags: { type: 'Module' | 'Course'; id: string }[] = [
+          { type: 'Module', id },
+          { type: 'Module', id: 'LIST' },
+        ];
+        if (courseId) {
+          tags.push({ type: 'Module', id: `COURSE_${courseId}` });
+          tags.push({ type: 'Course', id: courseId });
+        }
+        return tags;
+      },
     }),
   }),
 });

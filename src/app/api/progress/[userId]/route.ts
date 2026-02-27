@@ -1,8 +1,11 @@
 import { type NextRequest } from 'next/server';
 import { connectDB } from '@/lib/db/connect';
 import LearnerProgress from '@/lib/db/models/LearnerProgress';
+import Module from '@/lib/db/models/Module';
+import Gamification from '@/lib/db/models/Gamification';
 import { withAuth } from '@/lib/auth/rbac';
 import { successResponse, errorResponse } from '@/lib/utils/apiResponse';
+import { POINTS } from '@/lib/constants';
 
 // GET /api/progress/[userId]
 export const GET = withAuth(
@@ -18,6 +21,60 @@ export const GET = withAuth(
         return errorResponse('Insufficient permissions', 403);
       }
 
+      // Repair any stuck progress records (in_progress but should be completed)
+      const stuckRecords = await LearnerProgress.find({
+        user: userId,
+        status: 'in_progress',
+      });
+
+      if (stuckRecords.length > 0) {
+        const moduleIds = stuckRecords.map((r) => r.module);
+        const moduleDocs = await Module.find({ _id: { $in: moduleIds } })
+          .select('_id contents quiz')
+          .lean();
+        const moduleMap = new Map(moduleDocs.map((m) => [m._id.toString(), m]));
+
+        let repairedPointsDelta = 0;
+
+        for (const record of stuckRecords) {
+          const mod = moduleMap.get(record.module.toString());
+          if (!mod) continue;
+
+          const totalContents = mod.contents?.length ?? 0;
+          const allContentsDone =
+            totalContents > 0 && record.completedContents.length >= totalContents;
+
+          if (!allContentsDone) continue;
+
+          const hasQuiz = mod.quiz !== null && mod.quiz !== undefined;
+
+          if (!hasQuiz || record.quizPassed) {
+            const previousVideoPoints = record.videoPoints || 0;
+            record.status = 'completed';
+            record.videoCompleted = true;
+            record.videoPoints = record.videoPoints || POINTS.VIDEO_COMPLETION;
+            record.totalModulePoints =
+              (record.videoPoints || 0) + (record.quizPoints || 0) + (record.proofOfWorkPoints || 0);
+            record.completedAt = record.completedAt || new Date();
+            await record.save();
+
+            if (previousVideoPoints === 0) {
+              repairedPointsDelta += POINTS.VIDEO_COMPLETION;
+            }
+          }
+        }
+
+        // Sync repaired points to gamification
+        if (repairedPointsDelta > 0) {
+          await Gamification.findOneAndUpdate(
+            { user: userId },
+            { $inc: { totalPoints: repairedPointsDelta } },
+            { upsert: true }
+          );
+        }
+      }
+
+      // Fetch fresh records after repair
       const records = await LearnerProgress.find({ user: userId })
         .populate('course', 'title description thumbnail status')
         .populate('module', 'title order')

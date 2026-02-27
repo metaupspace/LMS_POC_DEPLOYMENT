@@ -11,9 +11,15 @@ export const POST = withAuth(
       await connectDB();
       const currentUserId = request.headers.get('x-user-id') ?? '';
 
-      const gamification = await Gamification.findOne({ user: currentUserId });
+      let gamification = await Gamification.findOne({ user: currentUserId });
       if (!gamification) {
-        return errorResponse('Gamification record not found', 404);
+        // Auto-create gamification record
+        gamification = new Gamification({
+          user: currentUserId,
+          totalPoints: 0,
+          badges: [],
+          streak: { current: 0, longest: 0 },
+        });
       }
 
       const today = new Date();

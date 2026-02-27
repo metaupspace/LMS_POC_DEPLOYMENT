@@ -60,26 +60,33 @@ export const POST = withAuth(
           }
         }
 
-        // Update Gamification totalPoints
-        const gamification = await Gamification.findOne({ user: record.user });
-        if (gamification) {
-          gamification.totalPoints += POINTS.PROOF_OF_WORK_APPROVED;
-
-          // Check badge thresholds
-          for (const tier of BADGE_TIERS) {
-            const alreadyHas = gamification.badges.some((b) => b.name === tier.name);
-            if (!alreadyHas && gamification.totalPoints >= tier.threshold) {
-              gamification.badges.push({
-                name: tier.name,
-                threshold: tier.threshold,
-                earnedAt: new Date(),
-                icon: tier.icon,
-              });
-            }
-          }
-
-          await gamification.save();
+        // Update Gamification totalPoints (auto-create if missing)
+        let gamification = await Gamification.findOne({ user: record.user });
+        if (!gamification) {
+          gamification = new Gamification({
+            user: record.user,
+            totalPoints: 0,
+            badges: [],
+            streak: { current: 0, longest: 0 },
+          });
         }
+
+        gamification.totalPoints += POINTS.PROOF_OF_WORK_APPROVED;
+
+        // Check badge thresholds
+        for (const tier of BADGE_TIERS) {
+          const alreadyHas = gamification.badges.some((b) => b.name === tier.name);
+          if (!alreadyHas && gamification.totalPoints >= tier.threshold) {
+            gamification.badges.push({
+              name: tier.name,
+              threshold: tier.threshold,
+              earnedAt: new Date(),
+              icon: tier.icon,
+            });
+          }
+        }
+
+        await gamification.save();
       }
 
       // Publish notification to staff

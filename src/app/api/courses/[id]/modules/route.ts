@@ -22,5 +22,5 @@ export const GET = withAuth(
       return errorResponse('Internal server error', 500);
     }
   },
-  ['admin', 'manager', 'coach']
+  ['admin', 'manager', 'coach', 'staff']
 );
