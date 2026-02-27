@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: lms-mongodb
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: lms_admin
+      MONGO_INITDB_ROOT_PASSWORD: lms_password_dev
+      MONGO_INITDB_DATABASE: lms_platform
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - lms-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: lms-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - lms-network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: lms-rabbitmq
+    restart: unless-stopped
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    environment:
+      RABBITMQ_DEFAULT_USER: lms_user
+      RABBITMQ_DEFAULT_PASS: lms_password_dev
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - lms-network
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lms-worker
+    restart: unless-stopped
+    command: ['node', 'workers/rabbitmq-worker.js']
+    environment:
+      MONGODB_URI: mongodb://lms_admin:lms_password_dev@mongodb:27017/lms_platform?authSource=admin
+      RABBITMQ_URL: amqp://lms_user:lms_password_dev@rabbitmq:5672
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@lms-platform.com}
+      NODE_ENV: production
+    depends_on:
+      - mongodb
+      - rabbitmq
+    networks:
+      - lms-network
+
+volumes:
+  mongodb_data:
+    driver: local
+  redis_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+
+networks:
+  lms-network:
+    driver: bridge
