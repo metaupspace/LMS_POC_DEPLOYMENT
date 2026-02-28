@@ -13,5 +13,6 @@ export { default as Calendar } from './Calendar';
 export type { CalendarEvent } from './Calendar';
 export { default as FileUpload } from './FileUpload';
 export { default as VideoPlayer } from './VideoPlayer';
+export { default as VideoUpload } from './VideoUpload';
 export { default as LoadingSpinner } from './LoadingSpinner';
 export { default as ConfirmDialog } from './ConfirmDialog';

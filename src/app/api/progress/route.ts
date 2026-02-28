@@ -151,6 +151,11 @@ export const PATCH = withAuth(
         module: moduleId,
       });
 
+      // Module already completed — no further processing needed
+      if (progress && progress.status === 'completed') {
+        return successResponse(progress.toJSON(), 'Module already completed');
+      }
+
       if (!progress) {
         // Auto-create progress record if missing (e.g., module added after assignment)
         const moduleDoc2 = await Module.findById(moduleId).lean();

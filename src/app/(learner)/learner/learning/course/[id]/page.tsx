@@ -43,6 +43,9 @@ const BADGE_TIERS = [
   { name: 'Premium', threshold: 5000 },
 ] as const;
 
+const VIDEO_POINTS = 30;
+const QUIZ_POINTS = 30;
+const PROOF_POINTS = 30;
 const MAX_FILE_SIZE_MB = 2;
 const ACCEPTED_FILE_TYPES = 'image/*,application/pdf';
 
@@ -219,10 +222,9 @@ function ModuleRow({ module, progress, isActive }: ModuleRowProps) {
 interface ProofOfWorkSectionProps {
   course: CourseData;
   proof: ProofOfWorkData | null;
-  userId: string;
 }
 
-function ProofOfWorkSection({ course, proof, userId }: ProofOfWorkSectionProps) {
+function ProofOfWorkSection({ course, proof }: ProofOfWorkSectionProps) {
   const dispatch = useAppDispatch();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProof, { isLoading: isUploading }] = useUploadProofMutation();
@@ -252,8 +254,7 @@ function ProofOfWorkSection({ course, proof, userId }: ProofOfWorkSectionProps) 
 
     const formData = new FormData();
     formData.append('file', selectedFile);
-    formData.append('course', course._id);
-    formData.append('user', userId);
+    formData.append('courseId', course._id);
 
     try {
       await uploadProof(formData).unwrap();
@@ -274,7 +275,7 @@ function ProofOfWorkSection({ course, proof, userId }: ProofOfWorkSectionProps) 
         })
       );
     }
-  }, [selectedFile, course._id, userId, uploadProof, dispatch]);
+  }, [selectedFile, course._id, uploadProof, dispatch]);
 
   // ── If already submitted ──
   if (proof) {
@@ -554,8 +555,14 @@ export default function CourseDetailPage() {
   }, [progressList]);
 
   const maxCoursePoints = useMemo(() => {
-    return modules.length * 100;
-  }, [modules.length]);
+    const proofEnabled = course?.proofOfWorkEnabled ?? false;
+    return modules.reduce((sum, mod) => {
+      let modMax = VIDEO_POINTS;
+      if (mod.quiz) modMax += QUIZ_POINTS;
+      if (proofEnabled) modMax += PROOF_POINTS;
+      return sum + modMax;
+    }, 0);
+  }, [modules, course?.proofOfWorkEnabled]);
 
   const allModulesCompleted = useMemo(() => {
     return modules.length > 0 && completedModuleCount === modules.length;
@@ -718,7 +725,6 @@ export default function CourseDetailPage() {
                 <ProofOfWorkSection
                   course={course}
                   proof={latestProof}
-                  userId={user?.id ?? ''}
                 />
               )}
             </section>

@@ -12,18 +12,22 @@ import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   Star,
-  Check,
   X,
   Award,
   Upload,
   BookOpen,
   ChevronRight,
+  CheckCircle2,
+  ClipboardList,
+  Play,
+  FileText,
 } from 'lucide-react';
 import { VideoPlayer, Card, Button, FileUpload } from '@/components/ui';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 import {
   useGetModuleByIdQuery,
+  getQuizId,
   type ModuleContentData,
 } from '@/store/slices/api/moduleApi';
 import {
@@ -52,13 +56,14 @@ const BADGE_TIERS = [
   { name: 'Premium', threshold: 5000, icon: '\u{1F48E}' },
 ] as const;
 
-const MAX_MODULE_POINTS = 100;
 const VIDEO_POINTS = 30;
+const QUIZ_POINTS = 30;
+const PROOF_POINTS = 30;
 const MAX_FILE_SIZE_MB = 2;
 
 // ─── Types ──────────────────────────────────────────────────
 
-type ViewPhase = 'content' | 'quiz' | 'proof' | 'completion';
+type ViewPhase = 'content' | 'content_complete' | 'quiz_ready' | 'quiz' | 'proof' | 'completion' | 'review';
 
 interface QuizAnswer {
   questionIndex: number;
@@ -146,11 +151,7 @@ function VideoContentView({ content, onComplete, isCompleted }: VideoContentView
     }
   }, [onComplete]);
 
-  // Track video time for the green progress bar
-  // VideoPlayer fires onComplete when >90% watched, so we estimate progress
-  // via a simple interval approach while video is mounted
   useEffect(() => {
-    // Reset on new content
     setVideoProgress(0);
     completedRef.current = isCompleted;
   }, [content.data, isCompleted]);
@@ -161,7 +162,13 @@ function VideoContentView({ content, onComplete, isCompleted }: VideoContentView
         src={content.data}
         title={content.title}
         downloadable={content.downloadable}
-        onComplete={() => {
+        onProgress={(percent) => {
+          setVideoProgress(percent);
+          if (percent >= 90) {
+            handleComplete();
+          }
+        }}
+        onEnded={() => {
           setVideoProgress(100);
           handleComplete();
         }}
@@ -174,6 +181,22 @@ function VideoContentView({ content, onComplete, isCompleted }: VideoContentView
 
       {/* Green progress bar */}
       <ContentProgressBar percent={isCompleted ? 100 : videoProgress} />
+
+      {/* Manual fallback for YouTube where tracking may be unreliable */}
+      {!isCompleted && (
+        <div className="flex items-center justify-between">
+          <p className="text-text-secondary text-caption">
+            Watch at least 90% to auto-complete
+          </p>
+          <button
+            type="button"
+            onClick={handleComplete}
+            className="text-caption text-primary-main hover:underline"
+          >
+            Mark as watched
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -243,9 +266,7 @@ interface QuizOptionProps {
   image: string;
   index: number;
   isSelected: boolean;
-  isSubmitted: boolean;
-  isCorrect: boolean;
-  isUserAnswer: boolean;
+  disabled: boolean;
   onSelect: () => void;
 }
 
@@ -254,47 +275,22 @@ function QuizOptionCard({
   image,
   index,
   isSelected,
-  isSubmitted,
-  isCorrect,
-  isUserAnswer,
+  disabled,
   onSelect,
 }: QuizOptionProps) {
   const optionLetters = ['A', 'B', 'C', 'D', 'E', 'F'];
   const letter = optionLetters[index] ?? String(index + 1);
 
-  let borderClass = 'border border-border-light';
-  let iconNode: React.ReactNode = null;
-
-  if (isSubmitted) {
-    if (isCorrect) {
-      borderClass = 'border-2 border-success';
-      iconNode = (
-        <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-success">
-          <Check className="h-3.5 w-3.5 text-white" />
-        </div>
-      );
-    } else if (isUserAnswer && !isCorrect) {
-      borderClass = 'border-2 border-error';
-      iconNode = (
-        <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-error">
-          <X className="h-3.5 w-3.5 text-white" />
-        </div>
-      );
-    }
-  } else if (isSelected) {
-    borderClass = 'border-2 border-success';
-  }
-
   return (
     <button
       type="button"
       onClick={onSelect}
-      disabled={isSubmitted}
+      disabled={disabled}
       className={`
         flex w-full items-center gap-md rounded-lg bg-[#FFF8ED] px-md py-md
         text-left transition-all duration-200
-        ${borderClass}
-        ${isSubmitted ? 'cursor-default' : 'cursor-pointer active:scale-[0.98]'}
+        ${isSelected ? 'border-2 border-primary-main' : 'border border-border-light'}
+        ${disabled ? 'cursor-default' : 'cursor-pointer active:scale-[0.98]'}
       `}
     >
       {/* Letter indicator */}
@@ -302,7 +298,7 @@ function QuizOptionCard({
         className={`
           flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full
           text-body-md font-semibold
-          ${isSelected && !isSubmitted ? 'bg-success text-white' : 'bg-white text-text-primary'}
+          ${isSelected ? 'bg-primary-main text-white' : 'bg-white text-text-primary'}
         `}
       >
         {letter}
@@ -324,9 +320,6 @@ function QuizOptionCard({
         )}
         <p className="text-body-lg text-text-primary">{text}</p>
       </div>
-
-      {/* Result icon */}
-      {iconNode}
     </button>
   );
 }
@@ -340,6 +333,17 @@ interface QuizPhaseProps {
   onComplete: (passed: boolean, earnedPoints: number) => void;
 }
 
+interface AttemptResultState {
+  score: number;
+  passed: boolean;
+  correctCount: number;
+  totalQuestions: number;
+  attemptsRemaining: number;
+  attemptNumber: number;
+  maxAttempts: number;
+  pointsEarned: number;
+}
+
 function QuizPhase({ quizId, existingProgress, onComplete }: QuizPhaseProps) {
   const dispatch = useAppDispatch();
 
@@ -351,110 +355,93 @@ function QuizPhase({ quizId, existingProgress, onComplete }: QuizPhaseProps) {
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
-  const [isAnswerRevealed, setIsAnswerRevealed] = useState(false);
-  const [answers, setAnswers] = useState<QuizAnswer[]>([]);
-  const [quizFinished, setQuizFinished] = useState(false);
-  const [retryAvailable, setRetryAvailable] = useState(false);
-  const [attemptsUsed, setAttemptsUsed] = useState(0);
+  const [answers, setAnswers] = useState<Record<number, number>>({});
+  const [attemptResult, setAttemptResult] = useState<AttemptResultState | null>(null);
 
   const currentQuestion = questions[currentQuestionIndex] ?? null;
   const isLastQuestion = currentQuestionIndex === questions.length - 1;
 
-  // Previous attempts count
-  const previousAttempts = useMemo(() => {
-    return existingProgress?.quizAttempts?.length ?? 0;
-  }, [existingProgress]);
-
   const maxAttempts = quiz?.maxAttempts ?? 3;
-
-  // Find correct option index for current question
-  const correctOptionIndex = useMemo(() => {
-    if (!currentQuestion) return -1;
-    return currentQuestion.options.findIndex((opt) => opt.isCorrect);
-  }, [currentQuestion]);
+  const previousAttemptCount = existingProgress?.quizAttempts?.length ?? 0;
 
   const handleSelectOption = useCallback((optionIndex: number) => {
-    if (!isAnswerRevealed) {
-      setSelectedOption(optionIndex);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAnswerRevealed]);
+    setSelectedOption(optionIndex);
+    setAnswers((prev) => ({ ...prev, [currentQuestionIndex]: optionIndex }));
+  }, [currentQuestionIndex]);
 
-  const handleSubmitAnswer = useCallback(() => {
-    if (selectedOption === null) return;
-    setIsAnswerRevealed(true);
-  }, [selectedOption]);
-
-  const handleNextQuestion = useCallback(async () => {
-    if (selectedOption === null) return;
-
-    const answer: QuizAnswer = {
-      questionIndex: currentQuestionIndex,
-      selectedOption,
-    };
-    const updatedAnswers = [...answers, answer];
-    setAnswers(updatedAnswers);
-
-    if (isLastQuestion) {
-      // Submit quiz to server
-      try {
-        const result = await attemptQuiz({
-          id: quizId,
-          body: { answers: updatedAnswers },
-        }).unwrap();
-
-        const attemptResult = result.data;
-        if (attemptResult) {
-          if (attemptResult.passed) {
-            onComplete(true, attemptResult.pointsEarned);
-          } else {
-            const totalAttemptsUsed = previousAttempts + 1;
-            setAttemptsUsed(totalAttemptsUsed);
-            if (totalAttemptsUsed < maxAttempts) {
-              setRetryAvailable(true);
-              setQuizFinished(true);
-            } else {
-              // No attempts remaining
-              setRetryAvailable(false);
-              setQuizFinished(true);
-            }
-          }
-        }
-      } catch {
-        dispatch(
-          addToast({
-            type: 'error',
-            message: 'Failed to submit quiz. Please try again.',
-            duration: 4000,
-          })
-        );
-      }
-    } else {
-      // Move to next question
+  const handleNextQuestion = useCallback(() => {
+    if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex((prev) => prev + 1);
-      setSelectedOption(null);
-      setIsAnswerRevealed(false);
+      setSelectedOption(answers[currentQuestionIndex + 1] ?? null);
     }
-  }, [
-    selectedOption,
-    currentQuestionIndex,
-    answers,
-    isLastQuestion,
-    attemptQuiz,
-    quizId,
-    onComplete,
-    previousAttempts,
-    maxAttempts,
-    dispatch,
-  ]);
+  }, [currentQuestionIndex, questions.length, answers]);
+
+  const handlePrevQuestion = useCallback(() => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex((prev) => prev - 1);
+      setSelectedOption(answers[currentQuestionIndex - 1] ?? null);
+    }
+  }, [currentQuestionIndex, answers]);
+
+  const handleSubmitQuiz = useCallback(async () => {
+    // Build answers array from the map
+    const answerArray: QuizAnswer[] = Object.entries(answers).map(
+      ([qIdx, optIdx]) => ({
+        questionIndex: Number(qIdx),
+        selectedOption: optIdx,
+      })
+    );
+
+    if (answerArray.length < questions.length) {
+      dispatch(
+        addToast({
+          type: 'error',
+          message: `Please answer all ${questions.length} questions. You answered ${answerArray.length}.`,
+          duration: 4000,
+        })
+      );
+      return;
+    }
+
+    try {
+      const result = await attemptQuiz({
+        id: quizId,
+        body: { answers: answerArray },
+      }).unwrap();
+
+      const data = result.data;
+      if (data) {
+        setAttemptResult({
+          score: data.score,
+          passed: data.passed,
+          correctCount: data.correctCount,
+          totalQuestions: data.totalQuestions,
+          attemptsRemaining: data.attemptsRemaining,
+          attemptNumber: data.attemptNumber,
+          maxAttempts: data.maxAttempts,
+          pointsEarned: data.pointsEarned,
+        });
+
+        if (data.passed) {
+          onComplete(true, data.pointsEarned);
+        }
+      }
+    } catch {
+      dispatch(
+        addToast({
+          type: 'error',
+          message: 'Failed to submit quiz. Please try again.',
+          duration: 4000,
+        })
+      );
+    }
+  }, [answers, questions.length, attemptQuiz, quizId, onComplete, dispatch]);
 
   const handleRetry = useCallback(() => {
     setCurrentQuestionIndex(0);
     setSelectedOption(null);
-    setIsAnswerRevealed(false);
-    setAnswers([]);
-    setQuizFinished(false);
-    setRetryAvailable(false);
+    setAnswers({});
+    setAttemptResult(null);
   }, []);
 
   // ── Loading state
@@ -483,8 +470,8 @@ function QuizPhase({ quizId, existingProgress, onComplete }: QuizPhaseProps) {
     );
   }
 
-  // ── Quiz finished (failed)
-  if (quizFinished) {
+  // ── Result screen (after submission)
+  if (attemptResult && !attemptResult.passed) {
     return (
       <div className="space-y-lg">
         <Card className="text-center">
@@ -498,14 +485,19 @@ function QuizPhase({ quizId, existingProgress, onComplete }: QuizPhaseProps) {
             <h3 className="text-h2 font-bold text-text-primary">
               Not quite there yet
             </h3>
-            <p className="mt-sm text-body-lg text-text-secondary">
-              You did not pass the quiz this time.
+            <p className="mt-sm text-h3 font-semibold text-error">
+              {attemptResult.score}%
+            </p>
+            <p className="mt-xs text-body-md text-text-secondary">
+              {attemptResult.correctCount} of {attemptResult.totalQuestions} correct
+              &middot; Need {quiz.passingScore}% to pass
             </p>
 
-            {retryAvailable ? (
+            {attemptResult.attemptsRemaining > 0 ? (
               <div className="mt-lg">
                 <p className="text-body-md text-text-secondary mb-md">
-                  Attempts used: {attemptsUsed} / {maxAttempts}
+                  Attempt {attemptResult.attemptNumber} of {attemptResult.maxAttempts}
+                  &middot; {attemptResult.attemptsRemaining} remaining
                 </p>
                 <Button
                   variant="primary"
@@ -518,9 +510,39 @@ function QuizPhase({ quizId, existingProgress, onComplete }: QuizPhaseProps) {
                 </Button>
               </div>
             ) : (
-              <p className="mt-lg text-body-md text-error font-medium">
-                No attempts remaining. Contact your coach for assistance.
-              </p>
+              <div className="mt-lg">
+                <p className="text-body-md text-error font-medium">
+                  No attempts remaining. Contact your coach for assistance.
+                </p>
+
+                {/* Attempt history */}
+                {existingProgress && existingProgress.quizAttempts.length > 0 && (
+                  <div className="mt-lg text-left">
+                    <p className="text-body-md font-medium text-text-primary mb-sm">
+                      Attempt History
+                    </p>
+                    <div className="divide-y divide-border-light rounded-md border border-border-light">
+                      {existingProgress.quizAttempts.map((a, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between px-md py-sm"
+                        >
+                          <span className="text-body-md text-text-secondary">
+                            Attempt {idx + 1}
+                          </span>
+                          <span
+                            className={`text-body-md font-semibold ${
+                              a.passed ? 'text-success' : 'text-error'
+                            }`}
+                          >
+                            {a.score}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </Card>
@@ -531,12 +553,39 @@ function QuizPhase({ quizId, existingProgress, onComplete }: QuizPhaseProps) {
   // ── Active quiz question
   if (!currentQuestion) return null;
 
+  const allAnswered = Object.keys(answers).length === questions.length;
+
   return (
     <div className="space-y-lg">
+      {/* Progress dots */}
+      <div className="flex gap-xs">
+        {questions.map((_, idx) => (
+          <div
+            key={idx}
+            className={`h-1.5 flex-1 rounded-full cursor-pointer transition-colors ${
+              idx === currentQuestionIndex
+                ? 'bg-primary-main'
+                : answers[idx] !== undefined
+                  ? 'bg-success'
+                  : 'bg-border-light'
+            }`}
+            onClick={() => {
+              setCurrentQuestionIndex(idx);
+              setSelectedOption(answers[idx] ?? null);
+            }}
+          />
+        ))}
+      </div>
+
       {/* Question header */}
-      <h3 className="text-h3 font-bold text-text-primary">
-        Q{currentQuestionIndex + 1}. {currentQuestion.questionText}
-      </h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-h3 font-bold text-text-primary">
+          Q{currentQuestionIndex + 1}. {currentQuestion.questionText}
+        </h3>
+        <span className="text-caption text-text-secondary whitespace-nowrap ml-md">
+          {currentQuestionIndex + 1}/{questions.length}
+        </span>
+      </div>
 
       {/* Question image (if any) */}
       {currentQuestion.questionImage && (
@@ -561,52 +610,53 @@ function QuizPhase({ quizId, existingProgress, onComplete }: QuizPhaseProps) {
             image={option.image}
             index={optIdx}
             isSelected={selectedOption === optIdx}
-            isSubmitted={isAnswerRevealed}
-            isCorrect={optIdx === correctOptionIndex}
-            isUserAnswer={selectedOption === optIdx}
+            disabled={false}
             onSelect={() => handleSelectOption(optIdx)}
           />
         ))}
       </div>
 
-      {/* Explanation (shown after reveal, for correct answer) */}
-      {isAnswerRevealed && correctOptionIndex >= 0 && (
-        <div className="rounded-md bg-success/5 border border-success/20 p-md">
-          <p className="text-body-md text-text-secondary">
-            <span className="font-semibold text-success">Correct Answer: </span>
-            {currentQuestion.options[correctOptionIndex]?.text}
-          </p>
-        </div>
-      )}
-
-      {/* Submit / Next Question button */}
-      {!isAnswerRevealed ? (
+      {/* Navigation */}
+      <div className="flex items-center justify-between gap-md">
         <Button
-          variant="primary"
+          variant="ghost"
           size="lg"
-          isBlock
-          disabled={selectedOption === null}
-          onClick={handleSubmitAnswer}
+          disabled={currentQuestionIndex === 0}
+          onClick={handlePrevQuestion}
           className="min-h-[48px]"
         >
-          Submit
+          Previous
         </Button>
-      ) : (
-        <Button
-          variant="primary"
-          size="lg"
-          isBlock
-          isLoading={isSubmittingQuiz}
-          onClick={handleNextQuestion}
-          className="min-h-[48px]"
-        >
-          {isLastQuestion ? 'Finish Quiz' : 'Next Question'}
-        </Button>
-      )}
 
-      {/* Progress indicator */}
+        {isLastQuestion ? (
+          <Button
+            variant="primary"
+            size="lg"
+            isBlock
+            disabled={!allAnswered}
+            isLoading={isSubmittingQuiz}
+            onClick={handleSubmitQuiz}
+            className="min-h-[48px]"
+          >
+            Submit ({Object.keys(answers).length}/{questions.length})
+          </Button>
+        ) : (
+          <Button
+            variant="primary"
+            size="lg"
+            isBlock
+            disabled={selectedOption === null}
+            onClick={handleNextQuestion}
+            className="min-h-[48px]"
+          >
+            Next
+          </Button>
+        )}
+      </div>
+
+      {/* Attempt info */}
       <p className="text-center text-caption text-text-secondary">
-        Question {currentQuestionIndex + 1} of {questions.length}
+        Attempt {previousAttemptCount + 1} of {maxAttempts}
       </p>
     </div>
   );
@@ -883,6 +933,399 @@ function CompletionPhase({
   );
 }
 
+// ─── Content Complete Screen ─────────────────────────────────
+
+interface ContentCompleteScreenProps {
+  hasQuiz: boolean;
+  quizMeta: { questionCount: number; passingScore: number; maxAttempts: number } | null;
+  onTakeQuiz: () => void;
+  onBackToCourse: () => void;
+  onContinueWithoutQuiz: () => void;
+}
+
+function ContentCompleteScreen({
+  hasQuiz,
+  quizMeta,
+  onTakeQuiz,
+  onBackToCourse,
+  onContinueWithoutQuiz,
+}: ContentCompleteScreenProps) {
+  return (
+    <div className="space-y-lg">
+      <Card className="text-center">
+        <div className="py-lg">
+          <div className="flex justify-center mb-md">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-success/10">
+              <CheckCircle2 className="h-8 w-8 text-success" />
+            </div>
+          </div>
+
+          <h3 className="text-h2 font-bold text-text-primary">
+            Content Completed!
+          </h3>
+          <p className="mt-sm text-body-lg text-text-secondary">
+            You&apos;ve finished all the content for this module
+          </p>
+
+          {/* Points earned */}
+          <div className="mt-md inline-flex items-center gap-sm rounded-lg bg-amber-50 px-lg py-sm">
+            <Star className="h-5 w-5 text-amber-400 fill-amber-400" />
+            <span className="text-h3 font-bold text-text-primary">+{VIDEO_POINTS} pts</span>
+          </div>
+        </div>
+      </Card>
+
+      {hasQuiz && quizMeta && (
+        <Card>
+          <div className="flex items-start gap-md">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary-light">
+              <ClipboardList className="h-5 w-5 text-primary-main" />
+            </div>
+            <div className="flex-1">
+              <h4 className="text-body-lg font-semibold text-text-primary">
+                Assessment Available
+              </h4>
+              <p className="mt-xs text-body-md text-text-secondary">
+                {quizMeta.questionCount} question{quizMeta.questionCount !== 1 ? 's' : ''}
+                {' '}&middot; Pass at {quizMeta.passingScore}%
+                {' '}&middot; {quizMeta.maxAttempts} attempt{quizMeta.maxAttempts !== 1 ? 's' : ''}
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      <div className="space-y-sm">
+        {hasQuiz ? (
+          <>
+            <Button
+              variant="primary"
+              size="lg"
+              isBlock
+              leftIcon={<ClipboardList className="h-4 w-4" />}
+              onClick={onTakeQuiz}
+              className="min-h-[48px]"
+            >
+              Take Assessment
+            </Button>
+            <Button
+              variant="ghost"
+              size="lg"
+              isBlock
+              onClick={onBackToCourse}
+              className="min-h-[48px]"
+            >
+              Back to Course
+            </Button>
+          </>
+        ) : (
+          <Button
+            variant="primary"
+            size="lg"
+            isBlock
+            onClick={onContinueWithoutQuiz}
+            className="min-h-[48px]"
+          >
+            Continue
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Quiz Ready Screen (returning learner) ───────────────────
+
+interface QuizReadyScreenProps {
+  quizMeta: { questionCount: number; passingScore: number; maxAttempts: number } | null;
+  existingProgress: ProgressData | null;
+  onStartQuiz: () => void;
+  onReviewContent: () => void;
+  onBackToCourse: () => void;
+}
+
+function QuizReadyScreen({
+  quizMeta,
+  existingProgress,
+  onStartQuiz,
+  onReviewContent,
+  onBackToCourse,
+}: QuizReadyScreenProps) {
+  const previousAttempts = existingProgress?.quizAttempts ?? [];
+  const attemptsUsed = previousAttempts.length;
+  const maxAttempts = quizMeta?.maxAttempts ?? 3;
+  const attemptsRemaining = Math.max(0, maxAttempts - attemptsUsed);
+
+  return (
+    <div className="space-y-lg">
+      <Card className="text-center">
+        <div className="py-lg">
+          <div className="flex justify-center mb-md">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-50">
+              <ClipboardList className="h-8 w-8 text-primary-main" />
+            </div>
+          </div>
+
+          <h3 className="text-h2 font-bold text-text-primary">
+            Assessment Pending
+          </h3>
+          <p className="mt-sm text-body-lg text-text-secondary">
+            You&apos;ve completed the content. Ready to take the quiz?
+          </p>
+
+          {/* Content completed badge */}
+          <div className="mt-md inline-flex items-center gap-sm rounded-lg bg-success/10 px-lg py-sm">
+            <CheckCircle2 className="h-4 w-4 text-success" />
+            <span className="text-body-md font-medium text-success">Content Completed</span>
+          </div>
+        </div>
+      </Card>
+
+      {/* Quiz info */}
+      {quizMeta && (
+        <Card>
+          <div className="flex items-start gap-md">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary-light">
+              <ClipboardList className="h-5 w-5 text-primary-main" />
+            </div>
+            <div className="flex-1">
+              <h4 className="text-body-lg font-semibold text-text-primary">
+                Quiz Details
+              </h4>
+              <p className="mt-xs text-body-md text-text-secondary">
+                {quizMeta.questionCount} question{quizMeta.questionCount !== 1 ? 's' : ''}
+                {' '}&middot; Pass at {quizMeta.passingScore}%
+              </p>
+              <p className="mt-xs text-body-md text-text-secondary">
+                {attemptsRemaining > 0 ? (
+                  <>{attemptsRemaining} of {maxAttempts} attempt{maxAttempts !== 1 ? 's' : ''} remaining</>
+                ) : (
+                  <span className="text-error font-medium">No attempts remaining</span>
+                )}
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Previous attempt history */}
+      {previousAttempts.length > 0 && (
+        <Card>
+          <p className="text-body-md font-semibold text-text-primary mb-sm">
+            Previous Attempts
+          </p>
+          <div className="divide-y divide-border-light rounded-md border border-border-light">
+            {previousAttempts.map((a, idx) => (
+              <div
+                key={idx}
+                className="flex items-center justify-between px-md py-sm"
+              >
+                <span className="text-body-md text-text-secondary">
+                  Attempt {idx + 1}
+                </span>
+                <span
+                  className={`text-body-md font-semibold ${
+                    a.passed ? 'text-success' : 'text-error'
+                  }`}
+                >
+                  {a.score}%
+                </span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      <div className="space-y-sm">
+        {attemptsRemaining > 0 ? (
+          <Button
+            variant="primary"
+            size="lg"
+            isBlock
+            leftIcon={<ClipboardList className="h-4 w-4" />}
+            onClick={onStartQuiz}
+            className="min-h-[48px]"
+          >
+            {attemptsUsed > 0 ? 'Retry Assessment' : 'Start Assessment'}
+          </Button>
+        ) : (
+          <div className="rounded-md bg-error/10 px-md py-md text-center">
+            <p className="text-body-md text-error font-medium">
+              No attempts remaining. Contact your coach for assistance.
+            </p>
+          </div>
+        )}
+        <Button
+          variant="secondary"
+          size="lg"
+          isBlock
+          onClick={onReviewContent}
+          className="min-h-[48px]"
+        >
+          Review Content
+        </Button>
+        <Button
+          variant="ghost"
+          size="lg"
+          isBlock
+          onClick={onBackToCourse}
+          className="min-h-[48px]"
+        >
+          Back to Course
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Review Phase (completed module, read-only) ─────────────
+
+interface ReviewPhaseProps {
+  moduleTitle: string;
+  contents: ModuleContentData[];
+  progressData: ProgressData | null;
+  hasQuiz: boolean;
+  quizMeta: { questionCount: number; passingScore: number; maxAttempts: number } | null;
+  maxPoints: number;
+  onBackToCourse: () => void;
+}
+
+function ReviewPhase({
+  moduleTitle,
+  contents,
+  progressData,
+  hasQuiz,
+  quizMeta,
+  maxPoints,
+  onBackToCourse,
+}: ReviewPhaseProps) {
+  const [expandedContent, setExpandedContent] = useState<number | null>(null);
+
+  const lastQuizAttempt = useMemo(() => {
+    const attempts = progressData?.quizAttempts ?? [];
+    return attempts.length > 0 ? attempts[attempts.length - 1] : null;
+  }, [progressData]);
+
+  return (
+    <div className="space-y-lg">
+      {/* Completed badge */}
+      <Card className="overflow-hidden">
+        <div className="flex items-center gap-md">
+          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-success">
+            <CheckCircle2 className="h-6 w-6 text-white" />
+          </div>
+          <div className="flex-1">
+            <p className="text-body-lg font-semibold text-success">Module Completed</p>
+            <p className="mt-[2px] text-body-md text-text-secondary flex items-center gap-sm">
+              <span className="flex items-center gap-[2px]">
+                <Star className="h-3.5 w-3.5 text-amber-400 fill-amber-400" />
+                {progressData?.totalModulePoints ?? 0}/{maxPoints} points
+              </span>
+              {progressData?.completedAt && (
+                <span>&middot; {new Date(progressData.completedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+              )}
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Module title */}
+      <div>
+        <h2 className="text-h3 font-semibold text-text-primary">{moduleTitle}</h2>
+        <p className="mt-xs text-body-md text-text-secondary">Review Content</p>
+      </div>
+
+      {/* Content list — expandable, no tracking */}
+      <div className="space-y-sm">
+        {contents.map((content, idx) => (
+          <Card key={idx} noPadding className="overflow-hidden">
+            {/* Content header — clickable to expand */}
+            <button
+              type="button"
+              onClick={() => setExpandedContent(expandedContent === idx ? null : idx)}
+              className="flex w-full items-center justify-between px-md py-md text-left hover:bg-surface-background transition-colors"
+            >
+              <div className="flex items-center gap-sm flex-1 min-w-0">
+                {content.type === 'video' ? (
+                  <Play className="h-4 w-4 text-text-secondary flex-shrink-0" />
+                ) : (
+                  <FileText className="h-4 w-4 text-text-secondary flex-shrink-0" />
+                )}
+                <span className="text-body-md font-medium text-text-primary line-clamp-1">
+                  {content.title || `Content ${idx + 1}`}
+                </span>
+              </div>
+              <div className="flex items-center gap-sm flex-shrink-0 ml-sm">
+                <CheckCircle2 className="h-4 w-4 text-success" />
+                <ChevronRight
+                  className={`h-4 w-4 text-text-secondary transition-transform duration-200 ${
+                    expandedContent === idx ? 'rotate-90' : ''
+                  }`}
+                />
+              </div>
+            </button>
+
+            {/* Expanded content body — no progress callbacks */}
+            {expandedContent === idx && (
+              <div className="border-t border-border-light p-md">
+                {content.type === 'video' ? (
+                  <VideoPlayer
+                    src={content.data}
+                    title={content.title}
+                    downloadable={content.downloadable}
+                  />
+                ) : (
+                  <div className="prose prose-sm max-w-none text-body-md text-text-primary leading-relaxed whitespace-pre-wrap">
+                    {content.data}
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+        ))}
+      </div>
+
+      {/* Quiz result summary (if quiz was taken) */}
+      {hasQuiz && progressData?.quizPassed && (
+        <Card>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-sm">
+              <ClipboardList className="h-5 w-5 text-text-secondary" />
+              <span className="text-body-md font-semibold text-text-primary">Assessment</span>
+            </div>
+            <span className="text-body-md font-semibold text-success flex items-center gap-xs">
+              <CheckCircle2 className="h-4 w-4" />
+              Passed
+            </span>
+          </div>
+          <div className="mt-sm flex items-center gap-md text-body-md text-text-secondary">
+            <span>Score: {lastQuizAttempt?.score ?? '—'}%</span>
+            <span>&middot;</span>
+            <span>Attempts: {progressData.quizAttempts.length}/{quizMeta?.maxAttempts ?? 3}</span>
+            <span>&middot;</span>
+            <span className="flex items-center gap-[2px]">
+              <Star className="h-3 w-3 text-amber-400 fill-amber-400" />
+              +{progressData.quizPoints} pts
+            </span>
+          </div>
+        </Card>
+      )}
+
+      {/* Back button */}
+      <Button
+        variant="primary"
+        size="lg"
+        isBlock
+        leftIcon={<ArrowLeft className="h-4 w-4" />}
+        onClick={onBackToCourse}
+        className="min-h-[48px]"
+      >
+        Back to Course
+      </Button>
+    </div>
+  );
+}
+
 // ─── Main Page Component ────────────────────────────────────
 
 export default function ModuleContentViewer() {
@@ -950,7 +1393,8 @@ export default function ModuleContentViewer() {
 
   const currentContent = contents[currentContentIndex] ?? null;
 
-  const hasQuiz = !!moduleData?.quiz;
+  const quizId = getQuizId(moduleData?.quiz ?? null);
+  const hasQuiz = !!quizId;
 
   // Find the next module in the course
   const nextModule = useMemo(() => {
@@ -983,12 +1427,21 @@ export default function ModuleContentViewer() {
       setCompletedContents(new Set(progressData.completedContents));
       setEarnedModulePoints(progressData.totalModulePoints);
 
-      // If video was already completed and quiz passed, jump to completion or relevant phase
+      // Module already completed — go straight to read-only review mode
+      if (progressData.status === 'completed') {
+        setPhase('review');
+        return;
+      }
+
+      // Video done + quiz passed but not officially completed (shouldn't happen, but handle)
       if (progressData.videoCompleted && progressData.quizPassed) {
-        // Already completed this module — show completion or content for review
-        // Keep in content phase for review
-      } else if (progressData.videoCompleted && !progressData.quizPassed && hasQuiz) {
-        setPhase('quiz');
+        setPhase('review');
+        return;
+      }
+
+      // Video done, quiz pending — show quiz ready screen
+      if (progressData.videoCompleted && !progressData.quizPassed && hasQuiz) {
+        setPhase('quiz_ready');
       }
     }
   }, [progressData, hasQuiz]);
@@ -1014,21 +1467,13 @@ export default function ModuleContentViewer() {
       // All contents done — progress was already saved per-content via handleContentComplete
       setEarnedModulePoints((prev) => Math.max(prev, VIDEO_POINTS));
 
-      // Transition to next phase
-      if (hasQuiz) {
-        setPhase('quiz');
-      } else if (course?.proofOfWorkEnabled) {
-        setPhase('proof');
-      } else {
-        setPhase('completion');
-      }
+      // Show content-complete summary screen (learner chooses next action)
+      setPhase('content_complete');
     }
   }, [
     currentContentIndex,
     contents.length,
     allContentsCompleted,
-    hasQuiz,
-    course?.proofOfWorkEnabled,
   ]);
 
   const handleQuizComplete = useCallback(
@@ -1054,6 +1499,51 @@ export default function ModuleContentViewer() {
   const handleProofSkip = useCallback(() => {
     setPhase('completion');
   }, []);
+
+  const handleBackToCourse = useCallback(() => {
+    if (courseId) {
+      router.push(`/learner/learning/course/${courseId}`);
+    } else {
+      router.push('/learner/learning');
+    }
+  }, [router, courseId]);
+
+  // When no quiz exists (or quiz already passed), proceed from content_complete to next step
+  const handleContentCompleteNext = useCallback(() => {
+    if (course?.proofOfWorkEnabled) {
+      setPhase('proof');
+    } else {
+      setPhase('completion');
+    }
+  }, [course?.proofOfWorkEnabled]);
+
+  const handleReviewContent = useCallback(() => {
+    setCurrentContentIndex(0);
+    setPhase('content');
+  }, []);
+
+  const handleStartQuiz = useCallback(() => {
+    setPhase('quiz');
+  }, []);
+
+  // Quiz metadata (from populated quiz object)
+  const quizMeta = useMemo(() => {
+    const quiz = moduleData?.quiz;
+    if (!quiz || typeof quiz === 'string') return null;
+    return {
+      questionCount: quiz.questions?.length ?? 0,
+      passingScore: quiz.passingScore ?? 70,
+      maxAttempts: quiz.maxAttempts ?? 3,
+    };
+  }, [moduleData?.quiz]);
+
+  // Dynamic max points for this module
+  const moduleMaxPoints = useMemo(() => {
+    let max = VIDEO_POINTS;
+    if (hasQuiz) max += QUIZ_POINTS;
+    if (course?.proofOfWorkEnabled) max += PROOF_POINTS;
+    return max;
+  }, [hasQuiz, course?.proofOfWorkEnabled]);
 
   // ── Loading state ──
   if (isLoadingModule) {
@@ -1119,7 +1609,20 @@ export default function ModuleContentViewer() {
       </button>
 
       {/* ── Points Progress Bar ── */}
-      <PointsProgressBar current={displayPoints} max={MAX_MODULE_POINTS} />
+      <PointsProgressBar current={displayPoints} max={moduleMaxPoints} />
+
+      {/* ── Phase: Review (completed module, read-only) ── */}
+      {phase === 'review' && (
+        <ReviewPhase
+          moduleTitle={moduleData.title}
+          contents={contents}
+          progressData={progressData}
+          hasQuiz={hasQuiz}
+          quizMeta={quizMeta}
+          maxPoints={moduleMaxPoints}
+          onBackToCourse={handleBackToCourse}
+        />
+      )}
 
       {/* ── Phase: Content Viewing ── */}
       {phase === 'content' && (
@@ -1183,21 +1686,52 @@ export default function ModuleContentViewer() {
             {currentContentIndex < contents.length - 1
               ? 'Next'
               : allContentsCompleted
-                ? hasQuiz
-                  ? 'Continue to Quiz'
-                  : 'Complete'
+                ? 'Complete Content'
                 : 'Next'}
           </Button>
         </div>
       )}
 
-      {/* ── Phase: Quiz Assessment ── */}
-      {phase === 'quiz' && moduleData.quiz && (
-        <QuizPhase
-          quizId={moduleData.quiz}
-          existingProgress={progressData}
-          onComplete={handleQuizComplete}
+      {/* ── Phase: Content Complete (summary + choice) ── */}
+      {phase === 'content_complete' && (
+        <ContentCompleteScreen
+          hasQuiz={hasQuiz && !progressData?.quizPassed}
+          quizMeta={quizMeta}
+          onTakeQuiz={handleStartQuiz}
+          onBackToCourse={handleBackToCourse}
+          onContinueWithoutQuiz={handleContentCompleteNext}
         />
+      )}
+
+      {/* ── Phase: Quiz Ready (returning learner) ── */}
+      {phase === 'quiz_ready' && (
+        <QuizReadyScreen
+          quizMeta={quizMeta}
+          existingProgress={progressData}
+          onStartQuiz={handleStartQuiz}
+          onReviewContent={handleReviewContent}
+          onBackToCourse={handleBackToCourse}
+        />
+      )}
+
+      {/* ── Phase: Quiz Assessment ── */}
+      {phase === 'quiz' && quizId && (
+        <div className="space-y-lg">
+          <QuizPhase
+            quizId={quizId}
+            existingProgress={progressData}
+            onComplete={handleQuizComplete}
+          />
+          <Button
+            variant="ghost"
+            size="lg"
+            isBlock
+            onClick={handleBackToCourse}
+            className="min-h-[48px]"
+          >
+            Exit Quiz
+          </Button>
+        </div>
       )}
 
       {/* ── Phase: Proof of Work ── */}

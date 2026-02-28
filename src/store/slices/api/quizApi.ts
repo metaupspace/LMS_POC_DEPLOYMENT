@@ -56,6 +56,10 @@ export interface QuizAttemptResult {
   passed: boolean;
   attemptsRemaining: number;
   pointsEarned: number;
+  correctCount: number;
+  totalQuestions: number;
+  attemptNumber: number;
+  maxAttempts: number;
 }
 
 // ─── API Slice ──────────────────────────────────────────

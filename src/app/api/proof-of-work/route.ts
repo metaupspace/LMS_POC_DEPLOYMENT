@@ -21,6 +21,11 @@ export const GET = withAuth(
 
       const filter: FilterQuery<IProofOfWork> = {};
 
+      // Staff: can only see their own proofs
+      if (currentRole === 'staff') {
+        filter.user = currentUserId;
+      }
+
       // Coach: only for their assigned courses
       if (currentRole === 'coach') {
         const coachCourses = await Course.find({ coach: currentUserId }).select('_id').lean();
@@ -31,9 +36,15 @@ export const GET = withAuth(
       const status = searchParams.get('status');
       if (status) filter.status = status;
 
-      // Course filter
-      const courseId = searchParams.get('courseId');
+      // Course filter (accept both 'course' and 'courseId' for compat)
+      const courseId = searchParams.get('course') ?? searchParams.get('courseId');
       if (courseId) filter.course = courseId;
+
+      // User filter (admin/manager/coach can filter by user; staff is already self-only)
+      const userId = searchParams.get('user');
+      if (userId && currentRole !== 'staff') {
+        filter.user = userId;
+      }
 
       const skip = (page - 1) * limit;
 
@@ -56,5 +67,5 @@ export const GET = withAuth(
       return errorResponse('Internal server error', 500);
     }
   },
-  ['admin', 'manager', 'coach']
+  ['admin', 'manager', 'coach', 'staff']
 );

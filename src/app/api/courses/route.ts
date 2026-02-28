@@ -48,8 +48,8 @@ export const GET = withAuth(
         ];
       }
 
-      // Cache key for list queries
-      const cacheKey = `courses:list:${JSON.stringify({ filter, page, limit, sortBy, sortOrder })}`;
+      // Cache key for list queries (include role since staff gets populated modules)
+      const cacheKey = `courses:list:${JSON.stringify({ filter, page, limit, sortBy, sortOrder, role: currentRole })}`;
       const cached = await redisGet<{ data: unknown[]; total: number }>(cacheKey);
 
       if (cached) {
@@ -61,21 +61,51 @@ export const GET = withAuth(
       const sortDir = sortOrder === 'asc' ? 1 : -1;
       const skip = (page - 1) * limit;
 
+      // For staff: populate modules with quiz data for the learner UI
+      let query = Course.find(filter)
+        .populate('coach', 'name empId')
+        .sort({ [sortField]: sortDir })
+        .skip(skip)
+        .limit(limit);
+
+      if (currentRole === 'staff') {
+        query = query.populate({
+          path: 'modules',
+          populate: { path: 'quiz' },
+        });
+      }
+
       const [courses, total] = await Promise.all([
-        Course.find(filter)
-          .populate('coach', 'name empId')
-          .sort({ [sortField]: sortDir })
-          .skip(skip)
-          .limit(limit)
-          .lean(),
+        query.lean(),
         Course.countDocuments(filter),
       ]);
 
       // Add module count
       const coursesWithCount = courses.map((c) => ({
         ...c,
-        moduleCount: c.modules?.length ?? 0,
+        moduleCount: Array.isArray(c.modules) ? c.modules.length : 0,
       }));
+
+      // For staff: strip isCorrect from quiz options (don't reveal answers)
+      if (currentRole === 'staff') {
+        for (const course of coursesWithCount) {
+          if (!Array.isArray(course.modules)) continue;
+          for (const mod of course.modules) {
+            if (typeof mod !== 'object' || !mod) continue;
+            const modObj = mod as unknown as Record<string, unknown>;
+            const quiz = modObj.quiz;
+            if (!quiz || typeof quiz !== 'object') continue;
+            const quizObj = quiz as Record<string, unknown>;
+            if (!Array.isArray(quizObj.questions)) continue;
+            quizObj.questions = (quizObj.questions as Record<string, unknown>[]).map((q) => ({
+              ...q,
+              options: (q.options as Record<string, unknown>[]).map(
+                ({ text, image }: Record<string, unknown>) => ({ text, image })
+              ),
+            }));
+          }
+        }
+      }
 
       await redisSet(cacheKey, { data: coursesWithCount, total }, 600).catch(() => {});
 

@@ -51,13 +51,11 @@ function isSameDay(dateStr: string, reference: Date): boolean {
   );
 }
 
-function getModuleDuration(mod: ModuleData): number {
-  return mod.contents.reduce((acc, c) => acc + (c.duration || 0), 0);
-}
-
-function getModuleQuestionCount(mod: ModuleData): number {
-  // If quiz exists, we show a question indicator; count contents for now
-  return mod.quiz ? 1 : 0;
+function getCourseDuration(modules: ModuleData[]): number {
+  return modules.reduce(
+    (acc, mod) => acc + mod.contents.reduce((s, c) => s + (c.duration || 0), 0),
+    0
+  );
 }
 
 // ─── Skeleton Components ───────────────────────────────────
@@ -103,16 +101,16 @@ function SessionSkeletonCard() {
   );
 }
 
-function ModuleSkeletonCard() {
+function CourseSkeletonCard() {
   return (
     <div className="rounded-md bg-surface-white shadow-sm overflow-hidden animate-pulse">
-      <div className="h-[200px] w-full bg-border-light" />
+      <div className="h-[180px] w-full bg-border-light" />
       <div className="p-lg space-y-md">
         <div className="h-3 w-20 rounded-full bg-border-light" />
-        <div className="h-4 w-1/2 rounded-sm bg-border-light" />
+        <div className="h-4 w-1/3 rounded-sm bg-border-light" />
         <div className="h-5 w-3/4 rounded-sm bg-border-light" />
         <div className="h-4 w-full rounded-sm bg-border-light" />
-        <div className="h-3 w-full rounded-sm bg-border-light" />
+        <div className="h-2 w-full rounded-full bg-border-light" />
         <div className="h-12 w-full rounded-sm bg-border-light" />
       </div>
     </div>
@@ -389,33 +387,47 @@ function SessionAttendanceCard({ session, userId }: SessionAttendanceCardProps) 
   );
 }
 
-// ─── Module Learning Card ──────────────────────────────────
+// ─── Course Learning Card ──────────────────────────────────
 
-interface ModuleLearningCardProps {
-  module: ModuleData;
-  course: CourseData | undefined;
-  progress: ProgressData | undefined;
+interface CourseLearningCardProps {
+  course: CourseData;
+  modules: ModuleData[];
+  progressMap: Map<string, ProgressData>;
 }
 
-function ModuleLearningCard({ module, course, progress }: ModuleLearningCardProps) {
+function CourseLearningCard({ course, modules, progressMap }: CourseLearningCardProps) {
   const router = useRouter();
-  const isInProgress = progress?.status === 'in_progress';
-  const duration = getModuleDuration(module);
-  const hasQuiz = getModuleQuestionCount(module) > 0;
+  const duration = getCourseDuration(modules);
+
+  const completedCount = useMemo(
+    () => modules.filter((m) => progressMap.get(m._id)?.status === 'completed').length,
+    [modules, progressMap]
+  );
+
+  const hasInProgress = useMemo(
+    () => modules.some((m) => progressMap.get(m._id)?.status === 'in_progress'),
+    [modules, progressMap]
+  );
+
+  const progressPercent = modules.length > 0
+    ? Math.round((completedCount / modules.length) * 100)
+    : 0;
+
+  const showProgress = completedCount > 0 || hasInProgress;
 
   return (
     <Card noPadding className="overflow-hidden">
       {/* Thumbnail with Play overlay */}
       <button
         type="button"
-        className="relative h-[200px] w-full bg-surface-background block"
-        onClick={() => router.push(`/learner/learning/module/${module._id}`)}
-        aria-label={`Play ${module.title}`}
+        className="relative h-[180px] w-full bg-surface-background block"
+        onClick={() => router.push(`/learner/learning/course/${course._id}`)}
+        aria-label={`${hasInProgress ? 'Continue' : 'Start'} ${course.title}`}
       >
-        {course?.thumbnail ? (
+        {course.thumbnail ? (
           <Image
             src={course.thumbnail}
-            alt={module.title}
+            alt={course.title}
             fill
             unoptimized
             className="object-cover"
@@ -426,7 +438,6 @@ function ModuleLearningCard({ module, course, progress }: ModuleLearningCardProp
             <BookOpen className="h-12 w-12 text-primary-main opacity-50" />
           </div>
         )}
-        {/* Play icon overlay */}
         <div className="absolute inset-0 flex items-center justify-center bg-black/20">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/90 shadow-md">
             <Play className="h-6 w-6 text-primary-main ml-[2px]" fill="currentColor" />
@@ -437,13 +448,13 @@ function ModuleLearningCard({ module, course, progress }: ModuleLearningCardProp
       {/* Content */}
       <div className="p-lg">
         {/* Domain tag */}
-        {course?.domain && (
+        {course.domain && (
           <p className="text-caption text-text-secondary font-medium uppercase tracking-wide">
             {course.domain}
           </p>
         )}
 
-        {/* Duration + Quiz indicator */}
+        {/* Duration + Module count */}
         <div className="mt-xs flex items-center gap-md text-body-md text-text-secondary">
           {duration > 0 && (
             <span className="flex items-center gap-xs">
@@ -451,24 +462,38 @@ function ModuleLearningCard({ module, course, progress }: ModuleLearningCardProp
               {duration} min
             </span>
           )}
-          {hasQuiz && (
-            <span className="flex items-center gap-xs">
-              <BookOpen className="h-3.5 w-3.5" />
-              Quiz
-            </span>
-          )}
+          <span className="flex items-center gap-xs">
+            <BookOpen className="h-3.5 w-3.5" />
+            {modules.length} module{modules.length !== 1 ? 's' : ''}
+          </span>
         </div>
 
         {/* Title */}
         <h3 className="mt-sm text-h3 font-semibold text-text-primary line-clamp-2">
-          {module.title}
+          {course.title}
         </h3>
 
         {/* Description */}
-        {module.description && (
+        {course.description && (
           <p className="mt-xs text-body-md text-text-secondary line-clamp-2">
-            {module.description}
+            {course.description}
           </p>
+        )}
+
+        {/* Progress bar (only if started) */}
+        {showProgress && (
+          <div className="mt-md">
+            <div className="flex items-center justify-between text-caption text-text-secondary">
+              <span>{completedCount} of {modules.length} modules</span>
+              <span className="font-semibold text-primary-main">{progressPercent}%</span>
+            </div>
+            <div className="mt-xs h-2 w-full overflow-hidden rounded-full bg-surface-background">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-amber-400 to-primary-main transition-all duration-500"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          </div>
         )}
 
         {/* Start / Continue button */}
@@ -477,10 +502,10 @@ function ModuleLearningCard({ module, course, progress }: ModuleLearningCardProp
           size="lg"
           isBlock
           leftIcon={<Play className="h-4 w-4" fill="currentColor" />}
-          onClick={() => router.push(`/learner/learning/module/${module._id}`)}
+          onClick={() => router.push(`/learner/learning/course/${course._id}`)}
           className="mt-md min-h-[48px]"
         >
-          {isInProgress ? 'Continue' : 'Start'}
+          {hasInProgress ? 'Continue' : 'Start'}
         </Button>
       </div>
     </Card>
@@ -567,15 +592,6 @@ export default function LearnerHome() {
     [sessions, today, user?.id]
   );
 
-  // Course map for quick lookup
-  const courseMap = useMemo(() => {
-    const map = new Map<string, CourseData>();
-    for (const c of courses) {
-      map.set(c._id, c);
-    }
-    return map;
-  }, [courses]);
-
   // Progress map keyed by moduleId
   const progressMap = useMemo(() => {
     const map = new Map<string, ProgressData>();
@@ -585,35 +601,71 @@ export default function LearnerHome() {
     return map;
   }, [progressList]);
 
-  // Learning modules: in-progress first, then not-started
-  // Only show modules from courses where user is assigned
-  const learningModules = useMemo(() => {
-    // Get course IDs where user is assigned
-    const assignedCourseIds = new Set(
-      courses
-        .filter((c) => user?.id && c.assignedStaff.some((s) => (typeof s === 'string' ? s : s._id) === user.id))
-        .map((c) => c._id)
+  // Assigned courses (where user is in assignedStaff)
+  const assignedCourses = useMemo(() => {
+    return courses.filter((c) =>
+      user?.id && c.assignedStaff.some((s) => (typeof s === 'string' ? s : s._id) === user.id)
     );
+  }, [courses, user?.id]);
 
-    // Get all modules from assigned courses
-    const assignedModules = modules.filter((m) => assignedCourseIds.has(m.course));
+  // Group modules by courseId
+  const courseModulesMap = useMemo(() => {
+    const map = new Map<string, ModuleData[]>();
+    const assignedIds = new Set(assignedCourses.map((c) => c._id));
 
-    // Separate into in-progress and not-started
-    const inProgress: ModuleData[] = [];
-    const notStarted: ModuleData[] = [];
+    for (const mod of modules) {
+      if (!assignedIds.has(mod.course)) continue;
+      const existing = map.get(mod.course) ?? [];
+      existing.push(mod);
+      map.set(mod.course, existing);
+    }
 
-    for (const mod of assignedModules) {
-      const progress = progressMap.get(mod._id);
-      if (progress?.status === 'in_progress') {
-        inProgress.push(mod);
-      } else if (!progress || progress.status === 'not_started') {
-        notStarted.push(mod);
+    for (const [key, mods] of map) {
+      map.set(key, mods.sort((a, b) => a.order - b.order));
+    }
+
+    return map;
+  }, [modules, assignedCourses]);
+
+  // Learning courses: in-progress first, then not-started, exclude completed
+  const learningCourses = useMemo(() => {
+    const inProgress: CourseData[] = [];
+    const notStarted: CourseData[] = [];
+
+    for (const c of assignedCourses) {
+      const mods = courseModulesMap.get(c._id) ?? [];
+      if (mods.length === 0) {
+        notStarted.push(c);
+        continue;
       }
-      // completed modules are not shown
+
+      const allCompleted = mods.every((m) => progressMap.get(m._id)?.status === 'completed');
+      if (allCompleted) continue; // hide completed courses
+
+      const hasStarted = mods.some((m) => {
+        const p = progressMap.get(m._id);
+        return p?.status === 'in_progress' || p?.status === 'completed';
+      });
+
+      if (hasStarted) {
+        inProgress.push(c);
+      } else {
+        notStarted.push(c);
+      }
     }
 
     return [...inProgress, ...notStarted];
-  }, [modules, courses, user?.id, progressMap]);
+  }, [assignedCourses, courseModulesMap, progressMap]);
+
+  const hasInProgressCourse = useMemo(() => {
+    return learningCourses.some((c) => {
+      const mods = courseModulesMap.get(c._id) ?? [];
+      return mods.some((m) => {
+        const p = progressMap.get(m._id);
+        return p?.status === 'in_progress' || p?.status === 'completed';
+      });
+    });
+  }, [learningCourses, courseModulesMap, progressMap]);
 
   // ── Loading state ──
   const isLoading =
@@ -676,24 +728,22 @@ export default function LearnerHome() {
       {/* ── Section 3: Continue Learning / Today's Task ── */}
       <section>
         <h2 className="text-h2 font-semibold text-text-primary">
-          {learningModules.some((m) => progressMap.get(m._id)?.status === 'in_progress')
-            ? 'Continue Learning'
-            : "Today's Task"}
+          {hasInProgressCourse ? 'Continue Learning' : "Today's Task"}
         </h2>
 
         {isLoading ? (
           <div className="mt-md space-y-md">
-            <ModuleSkeletonCard />
-            <ModuleSkeletonCard />
+            <CourseSkeletonCard />
+            <CourseSkeletonCard />
           </div>
-        ) : learningModules.length > 0 ? (
+        ) : learningCourses.length > 0 ? (
           <div className="mt-md space-y-md">
-            {learningModules.map((mod) => (
-              <ModuleLearningCard
-                key={mod._id}
-                module={mod}
-                course={courseMap.get(mod.course)}
-                progress={progressMap.get(mod._id)}
+            {learningCourses.map((c) => (
+              <CourseLearningCard
+                key={c._id}
+                course={c}
+                modules={courseModulesMap.get(c._id) ?? []}
+                progressMap={progressMap}
               />
             ))}
           </div>
@@ -701,10 +751,10 @@ export default function LearnerHome() {
           <div className="mt-md flex flex-col items-center justify-center rounded-md bg-surface-white py-2xl px-lg text-center shadow-sm">
             <BookOpen className="h-12 w-12 text-text-disabled" />
             <p className="mt-md text-body-lg font-medium text-text-secondary">
-              No tasks assigned yet
+              No courses assigned yet
             </p>
             <p className="mt-xs text-body-md text-text-disabled">
-              Your assigned courses and modules will appear here
+              Your assigned courses will appear here
             </p>
           </div>
         )}

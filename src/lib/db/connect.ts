@@ -1,5 +1,18 @@
 import mongoose from 'mongoose';
 
+// Register all models so they're available for populate() in any route.
+// In Next.js App Router, each API route is a separate entry point —
+// models are only registered if their file is imported.
+import './models/User';
+import './models/Course';
+import './models/Module';
+import './models/Quiz';
+import './models/TrainingSession';
+import './models/LearnerProgress';
+import './models/ProofOfWork';
+import './models/Gamification';
+import './models/Notification';
+
 const MONGODB_URI = process.env.MONGODB_URI;
 
 interface MongooseCache {

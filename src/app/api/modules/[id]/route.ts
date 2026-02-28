@@ -34,16 +34,38 @@ export const GET = withAuth(
       const currentRole = request.headers.get('x-user-role');
       const currentUserId = request.headers.get('x-user-id');
 
-      const moduleDoc = await Module.findById(id).populate('quiz').lean();
-      if (!moduleDoc) {
+      const rawModule = await Module.findById(id).populate('quiz').lean();
+      if (!rawModule) {
         return errorResponse('Module not found', 404);
+      }
+      const moduleDoc = rawModule as Record<string, unknown>;
+
+      // Repair orphaned quiz — quiz exists in Quiz collection but Module.quiz is null
+      if (!moduleDoc.quiz) {
+        const orphanedQuiz = await Quiz.findOne({ module: id }).lean();
+        if (orphanedQuiz) {
+          await Module.findByIdAndUpdate(id, { quiz: orphanedQuiz._id });
+          moduleDoc.quiz = orphanedQuiz;
+        }
       }
 
       // Staff can only view if course is assigned to them
       if (currentRole === 'staff') {
         const course = await Course.findById(moduleDoc.course).lean();
-        if (!course || !course.assignedStaff.some((s) => s.toString() === currentUserId)) {
+        if (!course || !course.assignedStaff.some((s: { toString(): string }) => s.toString() === currentUserId)) {
           return errorResponse('Insufficient permissions', 403);
+        }
+
+        // Strip isCorrect from quiz options for staff (don't reveal answers)
+        const quiz = moduleDoc.quiz as Record<string, unknown> | null;
+        if (quiz && Array.isArray(quiz.questions)) {
+          quiz.questions = (quiz.questions as Record<string, unknown>[]).map((q) => ({
+            ...q,
+            options: (q.options as Record<string, unknown>[]).map(({ text, image }) => ({
+              text,
+              image,
+            })),
+          }));
         }
       }
 

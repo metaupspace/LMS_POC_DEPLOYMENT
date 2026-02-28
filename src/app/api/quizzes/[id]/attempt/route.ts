@@ -193,7 +193,8 @@ export const POST = withAuth(
 
       await progress.save();
 
-      const attemptsRemaining = quiz.maxAttempts - progress.quizAttempts.length;
+      const attemptNumber = progress.quizAttempts.length;
+      const attemptsRemaining = quiz.maxAttempts - attemptNumber;
 
       return successResponse(
         {
@@ -201,6 +202,10 @@ export const POST = withAuth(
           passed,
           attemptsRemaining,
           pointsEarned,
+          correctCount,
+          totalQuestions: quiz.questions.length,
+          attemptNumber,
+          maxAttempts: quiz.maxAttempts,
         },
         passed ? 'Quiz passed!' : 'Quiz not passed. Try again.',
       );

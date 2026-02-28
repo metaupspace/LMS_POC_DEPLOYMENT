@@ -11,6 +11,20 @@ export interface ModuleContentData {
   downloadable: boolean;
 }
 
+// When quiz is populated by the API, it's a full object; otherwise it's just an ObjectId string
+export interface PopulatedQuiz {
+  _id: string;
+  module: string;
+  questions: {
+    questionText: string;
+    questionImage?: string;
+    options: { text: string; image?: string; isCorrect?: boolean }[];
+    points: number;
+  }[];
+  passingScore: number;
+  maxAttempts: number;
+}
+
 export interface ModuleData {
   _id: string;
   title: string;
@@ -18,9 +32,16 @@ export interface ModuleData {
   course: string;
   order: number;
   contents: ModuleContentData[];
-  quiz: string;
+  quiz: string | PopulatedQuiz | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Extract quiz ObjectId string regardless of whether quiz is populated or not */
+export function getQuizId(quiz: ModuleData['quiz']): string | null {
+  if (!quiz) return null;
+  if (typeof quiz === 'string') return quiz;
+  return quiz._id ?? null;
 }
 
 export interface GetModulesParams {

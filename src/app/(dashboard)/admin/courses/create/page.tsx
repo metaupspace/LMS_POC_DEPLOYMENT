@@ -20,6 +20,7 @@ import {
   Dropdown,
   LoadingSpinner,
   FileUpload,
+  VideoUpload,
 } from '@/components/ui';
 import { useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
@@ -1028,30 +1029,58 @@ export default function CreateCoursePage() {
                                 errors[`module-${mi}-content-${ci}-title`]
                               }
                             />
-                            <Input
-                              label={
-                                content.type === 'video'
-                                  ? 'Video URL'
-                                  : 'Text Content'
-                              }
-                              value={content.data}
-                              onChange={(e) =>
-                                updateContent(
-                                  mod.id,
-                                  content.id,
-                                  'data',
-                                  e.target.value
-                                )
-                              }
-                              placeholder={
-                                content.type === 'video'
-                                  ? 'https://...'
-                                  : 'Enter text content'
-                              }
-                              error={
-                                errors[`module-${mi}-content-${ci}-data`]
-                              }
-                            />
+                          </div>
+                          {content.type === 'video' ? (
+                            <div className="mt-sm">
+                              <label className="block text-body-md font-medium text-text-primary mb-xs">
+                                Video
+                              </label>
+                              <VideoUpload
+                                value={content.data}
+                                onChange={(url) =>
+                                  updateContent(
+                                    mod.id,
+                                    content.id,
+                                    'data',
+                                    url
+                                  )
+                                }
+                                onDurationDetected={(seconds) =>
+                                  updateContent(
+                                    mod.id,
+                                    content.id,
+                                    'duration',
+                                    Math.ceil(seconds / 60)
+                                  )
+                                }
+                              />
+                              {errors[`module-${mi}-content-${ci}-data`] && (
+                                <p className="text-error text-caption mt-1">
+                                  {errors[`module-${mi}-content-${ci}-data`]}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="mt-sm">
+                              <Input
+                                label="Text Content"
+                                value={content.data}
+                                onChange={(e) =>
+                                  updateContent(
+                                    mod.id,
+                                    content.id,
+                                    'data',
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="Enter text content"
+                                error={
+                                  errors[`module-${mi}-content-${ci}-data`]
+                                }
+                              />
+                            </div>
+                          )}
+                          <div className="mt-sm">
                             <Input
                               label="Duration (minutes)"
                               type="number"

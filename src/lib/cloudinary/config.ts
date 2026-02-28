@@ -11,6 +11,10 @@ export interface UploadResult {
   publicId: string;
   format: string;
   size: number;
+  duration?: number;
+  width?: number;
+  height?: number;
+  resourceType?: string;
 }
 
 export async function uploadFile(
@@ -37,6 +41,10 @@ export async function uploadFile(
             publicId: result.public_id,
             format: result.format,
             size: result.bytes,
+            duration: result.duration ?? undefined,
+            width: result.width ?? undefined,
+            height: result.height ?? undefined,
+            resourceType: result.resource_type ?? undefined,
           });
         }
       )

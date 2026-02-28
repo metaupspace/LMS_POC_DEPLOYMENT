@@ -51,7 +51,7 @@ const POINTS_INFO = [
   },
   {
     label: 'Module Max',
-    points: 100,
+    points: 90,
     icon: Trophy,
     color: 'bg-amber-50 text-amber-600',
     description: 'per module',

@@ -12,6 +12,11 @@ import {
   CalendarDays,
   Star,
   RotateCcw,
+  ChevronDown,
+  ChevronRight,
+  Timer,
+  Circle,
+  ClipboardList,
 } from 'lucide-react';
 import { Card, Badge, Button } from '@/components/ui';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
@@ -23,7 +28,7 @@ import {
 } from '@/store/slices/api/sessionApi';
 import { useGetProgressQuery, type ProgressData } from '@/store/slices/api/progressApi';
 import { useGetCoursesQuery, type CourseData } from '@/store/slices/api/courseApi';
-import { useGetModulesQuery, type ModuleData } from '@/store/slices/api/moduleApi';
+import { useGetModulesQuery, getQuizId, type ModuleData } from '@/store/slices/api/moduleApi';
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -40,6 +45,8 @@ const TABS: TabDef[] = [
   { key: 'completed', label: 'Completed' },
   { key: 'sessions', label: 'Sessions' },
 ];
+
+type CourseCategory = 'ongoing' | 'assigned' | 'completed';
 
 // ─── Helpers ────────────────────────────────────────────────
 
@@ -60,16 +67,36 @@ function isPastDate(dateStr: string, reference: Date): boolean {
   return d < ref;
 }
 
-function getModuleDuration(mod: ModuleData): number {
-  return mod.contents.reduce((acc, c) => acc + (c.duration || 0), 0);
-}
-
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-IN', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
   });
+}
+
+function categorizeCourse(
+  modules: ModuleData[],
+  progressMap: Map<string, ProgressData>
+): CourseCategory {
+  if (modules.length === 0) return 'assigned';
+
+  let hasStarted = false;
+  let allCompleted = true;
+
+  for (const mod of modules) {
+    const p = progressMap.get(mod._id);
+    if (p?.status === 'in_progress' || p?.status === 'completed') {
+      hasStarted = true;
+    }
+    if (!p || p.status !== 'completed') {
+      allCompleted = false;
+    }
+  }
+
+  if (allCompleted) return 'completed';
+  if (hasStarted) return 'ongoing';
+  return 'assigned';
 }
 
 // ─── Skeleton Components ────────────────────────────────────
@@ -84,13 +111,13 @@ function TabBarSkeleton() {
   );
 }
 
-function ModuleCardSkeleton() {
+function CourseCardSkeleton() {
   return (
     <div className="rounded-md bg-surface-white shadow-sm overflow-hidden animate-pulse">
-      <div className="h-[180px] w-full bg-border-light" />
+      <div className="h-[160px] w-full bg-border-light" />
       <div className="p-lg space-y-md">
         <div className="h-3 w-20 rounded-full bg-border-light" />
-        <div className="h-4 w-1/2 rounded-sm bg-border-light" />
+        <div className="h-4 w-1/3 rounded-sm bg-border-light" />
         <div className="h-5 w-3/4 rounded-sm bg-border-light" />
         <div className="h-4 w-full rounded-sm bg-border-light" />
         <div className="h-2 w-full rounded-full bg-border-light" />
@@ -129,155 +156,119 @@ function EmptyState({ icon: Icon, title, subtitle }: {
   );
 }
 
-// ─── Ongoing Module Card ────────────────────────────────────
+// ─── Module Row (within Course Card) ────────────────────────
 
-interface OngoingCardProps {
+interface ModuleRowProps {
   module: ModuleData;
-  course: CourseData | undefined;
-  progress: ProgressData;
+  progress: ProgressData | undefined;
 }
 
-function OngoingCard({ module, course, progress }: OngoingCardProps) {
+function ModuleRow({ module, progress }: ModuleRowProps) {
   const router = useRouter();
-  const duration = getModuleDuration(module);
-  const hasQuiz = !!module.quiz;
-
-  // Progress calculation: completedContents out of total contents
-  const totalContents = module.contents.length;
-  const completedCount = progress.completedContents.length;
-  const progressPercent = totalContents > 0
-    ? Math.round((completedCount / totalContents) * 100)
-    : 0;
-
-  const handleNavigate = useCallback(() => {
-    router.push(`/learner/learning/module/${module._id}`);
-  }, [router, module._id]);
+  const status = progress?.status ?? 'not_started';
+  const points = progress?.totalModulePoints ?? 0;
+  const hasQuiz = !!getQuizId(module.quiz);
+  const isQuizPending = hasQuiz && progress?.videoCompleted && !progress?.quizPassed;
 
   return (
-    <Card noPadding className="overflow-hidden">
-      {/* Thumbnail with Play overlay */}
-      <button
-        type="button"
-        className="relative h-[180px] w-full bg-surface-background block"
-        onClick={handleNavigate}
-        aria-label={`Continue ${module.title}`}
-      >
-        {course?.thumbnail ? (
-          <Image
-            src={course.thumbnail}
-            alt={module.title}
-            fill
-            unoptimized
-            className="object-cover"
-            sizes="100vw"
-          />
+    <button
+      type="button"
+      onClick={() => router.push(`/learner/learning/module/${module._id}`)}
+      className="flex w-full items-center gap-sm rounded-md px-sm py-xs text-left hover:bg-surface-background transition-colors"
+    >
+      <div className="flex-shrink-0">
+        {status === 'completed' ? (
+          <CheckCircle2 className="h-4 w-4 text-success" />
+        ) : isQuizPending ? (
+          <ClipboardList className="h-4 w-4 text-primary-main" />
+        ) : status === 'in_progress' ? (
+          <Timer className="h-4 w-4 text-amber-500" />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-primary-light">
-            <BookOpen className="h-12 w-12 text-primary-main opacity-50" />
-          </div>
+          <Circle className="h-4 w-4 text-text-disabled" />
         )}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/90 shadow-md">
-            <Play className="h-6 w-6 text-primary-main ml-[2px]" fill="currentColor" />
-          </div>
-        </div>
-      </button>
-
-      <div className="p-lg">
-        {/* Domain tag */}
-        {course?.domain && (
-          <p className="text-caption text-text-secondary font-medium uppercase tracking-wide">
-            {course.domain}
-          </p>
-        )}
-
-        {/* Duration + Quiz indicator */}
-        <div className="mt-xs flex items-center gap-md text-body-md text-text-secondary">
-          {duration > 0 && (
-            <span className="flex items-center gap-xs">
-              <Clock className="h-3.5 w-3.5" />
-              {duration} min
-            </span>
-          )}
-          {hasQuiz && (
-            <span className="flex items-center gap-xs">
-              <BookOpen className="h-3.5 w-3.5" />
-              Quiz
-            </span>
-          )}
-        </div>
-
-        {/* Title */}
-        <h3 className="mt-sm text-h3 font-semibold text-text-primary line-clamp-2">
-          {module.title}
-        </h3>
-
-        {/* Description */}
-        {module.description && (
-          <p className="mt-xs text-body-md text-text-secondary line-clamp-2">
-            {module.description}
-          </p>
-        )}
-
-        {/* Progress bar */}
-        <div className="mt-md">
-          <div className="flex items-center justify-between text-caption text-text-secondary">
-            <span>{completedCount} of {totalContents} completed</span>
-            <span className="font-semibold text-primary-main">{progressPercent}%</span>
-          </div>
-          <div className="mt-xs h-2 w-full overflow-hidden rounded-full bg-surface-background">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-amber-400 to-primary-main transition-all duration-500"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Continue button */}
-        <Button
-          variant="primary"
-          size="lg"
-          isBlock
-          leftIcon={<Play className="h-4 w-4" fill="currentColor" />}
-          onClick={handleNavigate}
-          className="mt-md min-h-[44px]"
-        >
-          Continue
-        </Button>
       </div>
-    </Card>
+      <span className="flex-1 text-body-md text-text-primary line-clamp-1">
+        {module.title}
+      </span>
+      {isQuizPending ? (
+        <span className="text-caption text-primary-main font-semibold bg-primary-light px-sm py-[2px] rounded-full">
+          Take Quiz
+        </span>
+      ) : points > 0 ? (
+        <span className="text-caption text-amber-500 font-medium flex items-center gap-[2px]">
+          <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+          {points}
+        </span>
+      ) : null}
+    </button>
   );
 }
 
-// ─── Assigned Module Card ───────────────────────────────────
+// ─── Course Card ────────────────────────────────────────────
 
-interface AssignedCardProps {
-  module: ModuleData;
-  course: CourseData | undefined;
+interface CourseCardProps {
+  course: CourseData;
+  modules: ModuleData[];
+  progressMap: Map<string, ProgressData>;
+  variant: CourseCategory;
 }
 
-function AssignedCard({ module, course }: AssignedCardProps) {
+function CourseCard({ course, modules, progressMap, variant }: CourseCardProps) {
   const router = useRouter();
-  const duration = getModuleDuration(module);
-  const hasQuiz = !!module.quiz;
+  const [expanded, setExpanded] = useState(false);
 
-  const handleNavigate = useCallback(() => {
-    router.push(`/learner/learning/module/${module._id}`);
-  }, [router, module._id]);
+  const completedModuleCount = useMemo(
+    () => modules.filter((m) => progressMap.get(m._id)?.status === 'completed').length,
+    [modules, progressMap]
+  );
+
+  const progressPercent = modules.length > 0
+    ? Math.round((completedModuleCount / modules.length) * 100)
+    : 0;
+
+  const totalPoints = useMemo(
+    () => modules.reduce((sum, m) => sum + (progressMap.get(m._id)?.totalModulePoints ?? 0), 0),
+    [modules, progressMap]
+  );
+
+  const totalDuration = useMemo(
+    () => modules.reduce(
+      (sum, m) => sum + m.contents.reduce((s, c) => s + (c.duration || 0), 0),
+      0
+    ),
+    [modules]
+  );
+
+  const navigateToCourse = useCallback(
+    () => router.push(`/learner/learning/course/${course._id}`),
+    [router, course._id]
+  );
+
+  const latestCompletedAt = useMemo(() => {
+    if (variant !== 'completed') return null;
+    let latest: string | null = null;
+    for (const mod of modules) {
+      const p = progressMap.get(mod._id);
+      if (p?.completedAt && (!latest || p.completedAt > latest)) {
+        latest = p.completedAt;
+      }
+    }
+    return latest;
+  }, [variant, modules, progressMap]);
 
   return (
     <Card noPadding className="overflow-hidden">
       {/* Thumbnail */}
       <button
         type="button"
-        className="relative h-[180px] w-full bg-surface-background block"
-        onClick={handleNavigate}
-        aria-label={`Start ${module.title}`}
+        className="relative h-[160px] w-full bg-surface-background block"
+        onClick={navigateToCourse}
+        aria-label={`${variant === 'ongoing' ? 'Continue' : variant === 'assigned' ? 'Start' : 'Review'} ${course.title}`}
       >
-        {course?.thumbnail ? (
+        {course.thumbnail ? (
           <Image
             src={course.thumbnail}
-            alt={module.title}
+            alt={course.title}
             fill
             unoptimized
             className="object-cover"
@@ -286,139 +277,137 @@ function AssignedCard({ module, course }: AssignedCardProps) {
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-primary-light">
             <BookOpen className="h-12 w-12 text-primary-main opacity-50" />
+          </div>
+        )}
+        {variant === 'ongoing' && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/90 shadow-md">
+              <Play className="h-6 w-6 text-primary-main ml-[2px]" fill="currentColor" />
+            </div>
+          </div>
+        )}
+        {variant === 'completed' && (
+          <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-success shadow-md">
+              <CheckCircle2 className="h-7 w-7 text-white" />
+            </div>
           </div>
         )}
       </button>
 
       <div className="p-lg">
         {/* Domain tag */}
-        {course?.domain && (
+        {course.domain && (
           <p className="text-caption text-text-secondary font-medium uppercase tracking-wide">
             {course.domain}
           </p>
         )}
 
-        {/* Duration + Quiz indicator */}
+        {/* Duration + Module count */}
         <div className="mt-xs flex items-center gap-md text-body-md text-text-secondary">
-          {duration > 0 && (
+          {totalDuration > 0 && (
             <span className="flex items-center gap-xs">
               <Clock className="h-3.5 w-3.5" />
-              {duration} min
+              {totalDuration} min
             </span>
           )}
-          {hasQuiz && (
-            <span className="flex items-center gap-xs">
-              <BookOpen className="h-3.5 w-3.5" />
-              Quiz
-            </span>
-          )}
+          <span className="flex items-center gap-xs">
+            <BookOpen className="h-3.5 w-3.5" />
+            {modules.length} module{modules.length !== 1 ? 's' : ''}
+          </span>
         </div>
 
         {/* Title */}
         <h3 className="mt-sm text-h3 font-semibold text-text-primary line-clamp-2">
-          {module.title}
+          {course.title}
         </h3>
 
         {/* Description */}
-        {module.description && (
+        {course.description && (
           <p className="mt-xs text-body-md text-text-secondary line-clamp-2">
-            {module.description}
+            {course.description}
           </p>
         )}
 
-        {/* Start button */}
-        <Button
-          variant="primary"
-          size="lg"
-          isBlock
-          leftIcon={<Play className="h-4 w-4" fill="currentColor" />}
-          onClick={handleNavigate}
-          className="mt-md min-h-[44px]"
-        >
-          Start
-        </Button>
-      </div>
-    </Card>
-  );
-}
-
-// ─── Completed Module Card ──────────────────────────────────
-
-interface CompletedCardProps {
-  module: ModuleData;
-  course: CourseData | undefined;
-  progress: ProgressData;
-}
-
-function CompletedCard({ module, course, progress }: CompletedCardProps) {
-  const router = useRouter();
-
-  const handleNavigate = useCallback(() => {
-    router.push(`/learner/learning/module/${module._id}`);
-  }, [router, module._id]);
-
-  return (
-    <Card noPadding className="overflow-hidden">
-      {/* Thumbnail with checkmark overlay */}
-      <div className="relative h-[180px] w-full bg-surface-background">
-        {course?.thumbnail ? (
-          <Image
-            src={course.thumbnail}
-            alt={module.title}
-            fill
-            unoptimized
-            className="object-cover"
-            sizes="100vw"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-primary-light">
-            <BookOpen className="h-12 w-12 text-primary-main opacity-50" />
+        {/* Progress bar (for ongoing and completed) */}
+        {variant !== 'assigned' && (
+          <div className="mt-md">
+            <div className="flex items-center justify-between text-caption text-text-secondary">
+              <span>{completedModuleCount} of {modules.length} modules</span>
+              {variant === 'ongoing' && (
+                <span className="font-semibold text-primary-main">{progressPercent}%</span>
+              )}
+            </div>
+            <div className="mt-xs h-2 w-full overflow-hidden rounded-full bg-surface-background">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-amber-400 to-primary-main transition-all duration-500"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
           </div>
         )}
-        {/* Completion overlay */}
-        <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-success shadow-md">
-            <CheckCircle2 className="h-7 w-7 text-white" />
-          </div>
-        </div>
-      </div>
 
-      <div className="p-lg">
-        {/* Domain tag */}
-        {course?.domain && (
-          <p className="text-caption text-text-secondary font-medium uppercase tracking-wide">
-            {course.domain}
-          </p>
-        )}
-
-        {/* Title */}
-        <h3 className="mt-sm text-h3 font-semibold text-text-primary line-clamp-2">
-          {module.title}
-        </h3>
-
-        {/* Points + Completion date */}
-        <div className="mt-sm flex items-center justify-between text-body-md">
-          <span className="flex items-center gap-xs text-amber-500 font-semibold">
-            <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-            {progress.totalModulePoints} pts
-          </span>
-          {progress.completedAt && (
-            <span className="text-text-secondary text-caption">
-              {formatDate(progress.completedAt)}
+        {/* Points + Completion date (for completed) */}
+        {variant === 'completed' && (
+          <div className="mt-sm flex items-center justify-between text-body-md">
+            <span className="flex items-center gap-xs text-amber-500 font-semibold">
+              <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+              {totalPoints} pts
             </span>
-          )}
-        </div>
+            {latestCompletedAt && (
+              <span className="text-text-secondary text-caption">
+                {formatDate(latestCompletedAt)}
+              </span>
+            )}
+          </div>
+        )}
 
-        {/* Review button */}
+        {/* Expandable module list */}
+        {modules.length > 0 && (
+          <>
+            <button
+              type="button"
+              onClick={() => setExpanded(!expanded)}
+              className="mt-md flex w-full items-center justify-between rounded-md px-sm py-xs text-body-md font-medium text-text-secondary hover:text-text-primary hover:bg-surface-background transition-colors"
+            >
+              <span>Modules</span>
+              {expanded ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+            </button>
+
+            {expanded && (
+              <div className="mt-xs space-y-[2px]">
+                {modules.map((mod) => (
+                  <ModuleRow
+                    key={mod._id}
+                    module={mod}
+                    progress={progressMap.get(mod._id)}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Action button */}
         <Button
-          variant="secondary"
+          variant={variant === 'completed' ? 'secondary' : 'primary'}
           size="lg"
           isBlock
-          leftIcon={<RotateCcw className="h-4 w-4" />}
-          onClick={handleNavigate}
+          leftIcon={
+            variant === 'completed' ? (
+              <RotateCcw className="h-4 w-4" />
+            ) : (
+              <Play className="h-4 w-4" fill="currentColor" />
+            )
+          }
+          onClick={navigateToCourse}
           className="mt-md min-h-[44px]"
         >
-          Review
+          {variant === 'ongoing' ? 'Continue' : variant === 'assigned' ? 'Start' : 'Review'}
         </Button>
       </div>
     </Card>
@@ -636,22 +625,13 @@ export default function MyLearning() {
     { skip: !user?.id }
   );
 
-  // ── Derived data (all wrapped in useMemo) ──
+  // ── Derived data ──
   const sessions = useMemo(() => sessionsResponse?.data ?? [], [sessionsResponse]);
   const progressList = useMemo(() => progressResponse?.data ?? [], [progressResponse]);
   const courses = useMemo(() => coursesResponse?.data ?? [], [coursesResponse]);
   const modules = useMemo(() => modulesResponse?.data ?? [], [modulesResponse]);
 
   const today = useMemo(() => new Date(), []);
-
-  // Course map for quick lookup
-  const courseMap = useMemo(() => {
-    const map = new Map<string, CourseData>();
-    for (const c of courses) {
-      map.set(c._id, c);
-    }
-    return map;
-  }, [courses]);
 
   // Progress map keyed by moduleId
   const progressMap = useMemo(() => {
@@ -662,43 +642,56 @@ export default function MyLearning() {
     return map;
   }, [progressList]);
 
-  // Assigned course IDs where user is in assignedStaff
-  const assignedCourseIds = useMemo(() => {
-    return new Set(
-      courses
-        .filter((c) => user?.id && c.assignedStaff.some((s) => (typeof s === 'string' ? s : s._id) === user.id))
-        .map((c) => c._id)
+  // Assigned courses (where user is in assignedStaff)
+  const assignedCourses = useMemo(() => {
+    return courses.filter((c) =>
+      user?.id && c.assignedStaff.some((s) => (typeof s === 'string' ? s : s._id) === user.id)
     );
   }, [courses, user?.id]);
 
-  // All modules from assigned courses
-  const assignedModules = useMemo(() => {
-    return modules.filter((m) => assignedCourseIds.has(m.course));
-  }, [modules, assignedCourseIds]);
+  // Group modules by courseId (only from assigned courses)
+  const courseModulesMap = useMemo(() => {
+    const map = new Map<string, ModuleData[]>();
+    const assignedIds = new Set(assignedCourses.map((c) => c._id));
 
-  // ── Tab data ──
-  const ongoingModules = useMemo(() => {
-    return assignedModules.filter((m) => {
-      const p = progressMap.get(m._id);
-      return p?.status === 'in_progress';
+    for (const mod of modules) {
+      if (!assignedIds.has(mod.course)) continue;
+      const existing = map.get(mod.course) ?? [];
+      existing.push(mod);
+      map.set(mod.course, existing);
+    }
+
+    // Sort modules by order within each course
+    for (const [key, mods] of map) {
+      map.set(key, mods.sort((a, b) => a.order - b.order));
+    }
+
+    return map;
+  }, [modules, assignedCourses]);
+
+  // ── Course categorization ──
+  const ongoingCourses = useMemo(() => {
+    return assignedCourses.filter((c) => {
+      const mods = courseModulesMap.get(c._id) ?? [];
+      return categorizeCourse(mods, progressMap) === 'ongoing';
     });
-  }, [assignedModules, progressMap]);
+  }, [assignedCourses, courseModulesMap, progressMap]);
 
   const assignedNotStarted = useMemo(() => {
-    return assignedModules.filter((m) => {
-      const p = progressMap.get(m._id);
-      return !p || p.status === 'not_started';
+    return assignedCourses.filter((c) => {
+      const mods = courseModulesMap.get(c._id) ?? [];
+      return categorizeCourse(mods, progressMap) === 'assigned';
     });
-  }, [assignedModules, progressMap]);
+  }, [assignedCourses, courseModulesMap, progressMap]);
 
-  const completedModules = useMemo(() => {
-    return assignedModules.filter((m) => {
-      const p = progressMap.get(m._id);
-      return p?.status === 'completed';
+  const completedCourses = useMemo(() => {
+    return assignedCourses.filter((c) => {
+      const mods = courseModulesMap.get(c._id) ?? [];
+      return categorizeCourse(mods, progressMap) === 'completed';
     });
-  }, [assignedModules, progressMap]);
+  }, [assignedCourses, courseModulesMap, progressMap]);
 
-  // Sessions: filter where user is enrolled
+  // ── Sessions: filter where user is enrolled ──
   const userSessions = useMemo(() => {
     return sessions.filter((s) => user?.id && s.enrolledStaff.includes(user.id));
   }, [sessions, user?.id]);
@@ -717,11 +710,11 @@ export default function MyLearning() {
 
   // ── Tab counts ──
   const tabCounts: Record<TabKey, number> = useMemo(() => ({
-    ongoing: ongoingModules.length,
+    ongoing: ongoingCourses.length,
     assigned: assignedNotStarted.length,
-    completed: completedModules.length,
+    completed: completedCourses.length,
     sessions: userSessions.length,
-  }), [ongoingModules.length, assignedNotStarted.length, completedModules.length, userSessions.length]);
+  }), [ongoingCourses.length, assignedNotStarted.length, completedCourses.length, userSessions.length]);
 
   // ── Loading ──
   const isLoading = isLoadingSessions || isLoadingProgress || isLoadingCourses || isLoadingModules;
@@ -779,22 +772,19 @@ export default function MyLearning() {
         <section className="space-y-md">
           {isLoading ? (
             <>
-              <ModuleCardSkeleton />
-              <ModuleCardSkeleton />
+              <CourseCardSkeleton />
+              <CourseCardSkeleton />
             </>
-          ) : ongoingModules.length > 0 ? (
-            ongoingModules.map((mod) => {
-              const progress = progressMap.get(mod._id);
-              if (!progress) return null;
-              return (
-                <OngoingCard
-                  key={mod._id}
-                  module={mod}
-                  course={courseMap.get(mod.course)}
-                  progress={progress}
-                />
-              );
-            })
+          ) : ongoingCourses.length > 0 ? (
+            ongoingCourses.map((c) => (
+              <CourseCard
+                key={c._id}
+                course={c}
+                modules={courseModulesMap.get(c._id) ?? []}
+                progressMap={progressMap}
+                variant="ongoing"
+              />
+            ))
           ) : (
             <EmptyState
               icon={BookOpen}
@@ -810,22 +800,24 @@ export default function MyLearning() {
         <section className="space-y-md">
           {isLoading ? (
             <>
-              <ModuleCardSkeleton />
-              <ModuleCardSkeleton />
+              <CourseCardSkeleton />
+              <CourseCardSkeleton />
             </>
           ) : assignedNotStarted.length > 0 ? (
-            assignedNotStarted.map((mod) => (
-              <AssignedCard
-                key={mod._id}
-                module={mod}
-                course={courseMap.get(mod.course)}
+            assignedNotStarted.map((c) => (
+              <CourseCard
+                key={c._id}
+                course={c}
+                modules={courseModulesMap.get(c._id) ?? []}
+                progressMap={progressMap}
+                variant="assigned"
               />
             ))
           ) : (
             <EmptyState
               icon={BookOpen}
               title="All caught up!"
-              subtitle="You have started all your assigned modules"
+              subtitle="You have started all your assigned courses"
             />
           )}
         </section>
@@ -836,27 +828,24 @@ export default function MyLearning() {
         <section className="space-y-md">
           {isLoading ? (
             <>
-              <ModuleCardSkeleton />
-              <ModuleCardSkeleton />
+              <CourseCardSkeleton />
+              <CourseCardSkeleton />
             </>
-          ) : completedModules.length > 0 ? (
-            completedModules.map((mod) => {
-              const progress = progressMap.get(mod._id);
-              if (!progress) return null;
-              return (
-                <CompletedCard
-                  key={mod._id}
-                  module={mod}
-                  course={courseMap.get(mod.course)}
-                  progress={progress}
-                />
-              );
-            })
+          ) : completedCourses.length > 0 ? (
+            completedCourses.map((c) => (
+              <CourseCard
+                key={c._id}
+                course={c}
+                modules={courseModulesMap.get(c._id) ?? []}
+                progressMap={progressMap}
+                variant="completed"
+              />
+            ))
           ) : (
             <EmptyState
               icon={CheckCircle2}
-              title="No completed modules yet"
-              subtitle="Complete your assigned modules to see them here"
+              title="No completed courses yet"
+              subtitle="Complete your assigned courses to see them here"
             />
           )}
         </section>

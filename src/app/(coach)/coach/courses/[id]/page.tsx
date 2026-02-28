@@ -26,15 +26,15 @@ import { addToast } from '@/store/slices/uiSlice';
 import {
   useGetCourseByIdQuery,
   useGetCourseModulesQuery,
+  useGetCourseAnalyticsQuery,
   type ModuleData,
+  type LearnerStatData,
 } from '@/store/slices/api/courseApi';
-import { useGetProgressQuery, type ProgressData } from '@/store/slices/api/progressApi';
 import {
   useGetProofsQuery,
   useReviewProofMutation,
   type ProofOfWorkData,
 } from '@/store/slices/api/proofOfWorkApi';
-import { useGetUsersQuery, type UserData } from '@/store/slices/api/userApi';
 import type { CourseStatus, ProofOfWorkStatus, LearnerProgressStatus } from '@/types';
 
 // ─── Helpers ──────────────────────────────────────────────
@@ -108,6 +108,15 @@ function progressStatusLabel(status: LearnerProgressStatus): string {
   }
 }
 
+/** Extract user info from a possibly-populated Mongoose ref field */
+function extractUserInfo(field: unknown): { id: string; name?: string; empId?: string } {
+  if (typeof field === 'object' && field !== null && '_id' in field) {
+    const obj = field as { _id: string; name?: string; empId?: string };
+    return { id: String(obj._id), name: obj.name, empId: obj.empId };
+  }
+  return { id: String(field) };
+}
+
 // ─── Skeleton Blocks ──────────────────────────────────────
 
 function SkeletonHeader() {
@@ -148,6 +157,7 @@ interface ModuleAccordionItemProps {
 
 function ModuleAccordionItem({ module, isExpanded, onToggle }: ModuleAccordionItemProps) {
   const contentCount = module.contents.length;
+  const moduleMaxPts = 30 + (module.quiz ? 30 : 0);
 
   return (
     <div className="rounded-md border border-border-light bg-surface-white overflow-hidden">
@@ -166,6 +176,9 @@ function ModuleAccordionItem({ module, isExpanded, onToggle }: ModuleAccordionIt
             </h4>
             <p className="text-caption text-text-secondary">
               {contentCount} content{contentCount !== 1 ? 's' : ''}
+              {module.quiz ? ' \u00B7 Quiz' : ''}
+              {' \u00B7 '}
+              <span className="text-warning font-medium">{moduleMaxPts} pts</span>
             </p>
           </div>
         </div>
@@ -211,41 +224,11 @@ function ModuleAccordionItem({ module, isExpanded, onToggle }: ModuleAccordionIt
 // ─── Staff Progress Row ───────────────────────────────────
 
 interface StaffProgressRowProps {
-  staffId: string;
-  userMap: Map<string, UserData>;
-  progressRecords: ProgressData[];
-  totalModules: number;
-  modules: ModuleData[];
+  stat: LearnerStatData;
 }
 
-function StaffProgressRow({
-  staffId,
-  userMap,
-  progressRecords,
-  totalModules,
-  modules,
-}: StaffProgressRowProps) {
+function StaffProgressRow({ stat }: StaffProgressRowProps) {
   const [expanded, setExpanded] = useState(false);
-
-  const staffUser = userMap.get(staffId);
-  const staffName = staffUser?.name ?? 'Unknown';
-  const staffEmpId = staffUser?.empId ?? staffId;
-
-  // Count completed modules
-  const completedModules = progressRecords.filter((p) => p.status === 'completed').length;
-  const progressPercent = totalModules > 0 ? Math.round((completedModules / totalModules) * 100) : 0;
-
-  // Total points
-  const totalPoints = progressRecords.reduce((sum, p) => sum + p.totalModulePoints, 0);
-
-  // Build module status map
-  const moduleStatusMap = useMemo(() => {
-    const map = new Map<string, LearnerProgressStatus>();
-    for (const p of progressRecords) {
-      map.set(p.module, p.status);
-    }
-    return map;
-  }, [progressRecords]);
 
   return (
     <div className="rounded-md border border-border-light bg-surface-white overflow-hidden">
@@ -258,14 +241,14 @@ function StaffProgressRow({
         <div className="flex items-center justify-between w-full">
           <div className="min-w-0">
             <p className="text-body-md font-semibold text-text-primary text-left truncate">
-              {staffName}
+              {stat.user.name}
             </p>
-            <p className="text-caption text-text-secondary text-left">{staffEmpId}</p>
+            <p className="text-caption text-text-secondary text-left">{stat.user.empId}</p>
           </div>
           <div className="flex items-center gap-sm flex-shrink-0">
             <div className="flex items-center gap-xs text-caption text-text-secondary">
               <Star className="h-3.5 w-3.5 text-warning" strokeWidth={1.5} />
-              {totalPoints} pts
+              {stat.pointsEarned} pts
             </div>
             {expanded ? (
               <ChevronUp className="h-4 w-4 text-text-secondary" strokeWidth={1.5} />
@@ -280,11 +263,11 @@ function StaffProgressRow({
           <div className="flex-1 h-2 rounded-full bg-surface-background overflow-hidden">
             <div
               className="h-full rounded-full bg-primary-main transition-all duration-500"
-              style={{ width: `${progressPercent}%` }}
+              style={{ width: `${stat.completionPercent}%` }}
             />
           </div>
           <span className="text-caption font-semibold text-text-primary flex-shrink-0 w-[36px] text-right">
-            {progressPercent}%
+            {stat.completionPercent}%
           </span>
         </div>
       </button>
@@ -292,18 +275,18 @@ function StaffProgressRow({
       {/* Expanded: per-module status */}
       {expanded && (
         <div className="border-t border-border-light px-md py-md space-y-sm">
-          {modules.map((mod) => {
-            const modStatus: LearnerProgressStatus = moduleStatusMap.get(mod._id) ?? 'not_started';
+          {stat.moduleProgress.map((mp) => {
+            const modStatus = mp.status as LearnerProgressStatus;
             return (
               <div
-                key={mod._id}
+                key={mp.moduleId}
                 className="flex items-center justify-between rounded-sm bg-surface-background px-md py-sm"
               >
                 <div className="flex items-center gap-sm min-w-0">
                   <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-primary-light text-caption font-semibold text-primary-main">
-                    {mod.order}
+                    {mp.moduleOrder}
                   </div>
-                  <span className="text-body-md text-text-primary truncate">{mod.title}</span>
+                  <span className="text-body-md text-text-primary truncate">{mp.moduleTitle}</span>
                 </div>
                 <div className="flex items-center gap-xs flex-shrink-0 ml-sm">
                   {progressStatusIcon(modStatus)}
@@ -326,7 +309,7 @@ type PowFilterStatus = 'all' | ProofOfWorkStatus;
 
 interface ProofCardProps {
   proof: ProofOfWorkData;
-  userMap: Map<string, UserData>;
+  userMap: Map<string, { name: string; empId: string }>;
 }
 
 function ProofCard({ proof, userMap }: ProofCardProps) {
@@ -335,8 +318,10 @@ function ProofCard({ proof, userMap }: ProofCardProps) {
   const [activeAction, setActiveAction] = useState<'approve' | 'redo' | null>(null);
   const [reviewNote, setReviewNote] = useState('');
 
-  const staffUser = userMap.get(proof.user);
-  const staffName = staffUser?.name ?? 'Unknown';
+  // proof.user can be a populated object or a plain string ID
+  const userInfo = extractUserInfo(proof.user);
+  const staffUser = userMap.get(userInfo.id);
+  const staffName = userInfo.name ?? staffUser?.name ?? 'Unknown';
 
   const handleReview = useCallback(
     async (status: 'approved' | 'redo_requested') => {
@@ -482,14 +467,9 @@ export default function CoachCourseDetail() {
   // ── Data Fetching ──
   const { data: courseRes, isLoading: courseLoading, error: courseError } = useGetCourseByIdQuery(id);
   const { data: modulesRes, isLoading: modulesLoading } = useGetCourseModulesQuery(id);
-  const { data: progressRes, isLoading: progressLoading } = useGetProgressQuery(
-    { course: id, limit: 200 },
-    { skip: !id }
-  );
-  const { data: usersRes } = useGetUsersQuery(
-    { role: 'staff', limit: 200, status: 'active' },
-    { skip: !id }
-  );
+  const { data: analyticsRes, isLoading: analyticsLoading } = useGetCourseAnalyticsQuery(id, {
+    skip: !id,
+  });
   const { data: proofsRes, isLoading: proofsLoading } = useGetProofsQuery(
     { course: id, limit: 100 },
     { skip: !id }
@@ -506,28 +486,24 @@ export default function CoachCourseDetail() {
     () => [...(modulesRes?.data ?? [])].sort((a, b) => a.order - b.order),
     [modulesRes?.data]
   );
-  const progressRecords = useMemo(() => progressRes?.data ?? [], [progressRes?.data]);
+  // Calculate max obtainable points for this course
+  const courseMaxPoints = useMemo(() => {
+    const modulePts = modules.reduce((sum, mod) => sum + 30 + (mod.quiz ? 30 : 0), 0);
+    return modulePts + (course?.proofOfWorkEnabled ? 30 : 0);
+  }, [modules, course?.proofOfWorkEnabled]);
+
+  const analytics = analyticsRes?.data ?? null;
+  const perLearnerStats = useMemo(() => analytics?.perLearnerStats ?? [], [analytics?.perLearnerStats]);
   const proofs = useMemo(() => proofsRes?.data ?? [], [proofsRes?.data]);
 
-  // User lookup map
+  // User lookup map from analytics data (for PoW tab)
   const userMap = useMemo(() => {
-    const map = new Map<string, UserData>();
-    for (const u of usersRes?.data ?? []) {
-      map.set(u._id, u);
+    const map = new Map<string, { name: string; empId: string }>();
+    for (const stat of perLearnerStats) {
+      map.set(stat.user._id, { name: stat.user.name, empId: stat.user.empId });
     }
     return map;
-  }, [usersRes?.data]);
-
-  // Group progress by user
-  const progressByUser = useMemo(() => {
-    const map = new Map<string, ProgressData[]>();
-    for (const p of progressRecords) {
-      const existing = map.get(p.user) ?? [];
-      existing.push(p);
-      map.set(p.user, existing);
-    }
-    return map;
-  }, [progressRecords]);
+  }, [perLearnerStats]);
 
   // Filter proofs
   const filteredProofs = useMemo(() => {
@@ -649,6 +625,11 @@ export default function CoachCourseDetail() {
             <Users className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} />
             {course.assignedStaff.length} Enrolled
           </span>
+          <span className="text-text-disabled">&bull;</span>
+          <span className="flex items-center gap-xs">
+            <Star className="h-4 w-4 flex-shrink-0 text-warning" strokeWidth={1.5} />
+            {courseMaxPoints} Max Points
+          </span>
         </div>
       </section>
 
@@ -716,23 +697,16 @@ export default function CoachCourseDetail() {
         {/* ── Progress Tab ── */}
         {activeTab === 'progress' && (
           <div className="mt-md">
-            {progressLoading ? (
+            {analyticsLoading ? (
               <SkeletonList />
-            ) : course.assignedStaff.length > 0 ? (
+            ) : perLearnerStats.length > 0 ? (
               <div className="space-y-sm">
-                {course.assignedStaff.map((staff) => {
-                  const staffId = typeof staff === 'string' ? staff : staff._id;
-                  return (
-                    <StaffProgressRow
-                      key={staffId}
-                      staffId={staffId}
-                      userMap={userMap}
-                      progressRecords={progressByUser.get(staffId) ?? []}
-                      totalModules={modules.length}
-                      modules={modules}
-                    />
-                  );
-                })}
+                {perLearnerStats.map((stat) => (
+                  <StaffProgressRow
+                    key={stat.user._id}
+                    stat={stat}
+                  />
+                ))}
               </div>
             ) : (
               <div className="flex flex-col items-center rounded-md bg-surface-white py-xl px-lg text-center shadow-sm">

@@ -22,7 +22,10 @@ export const GET = withAuth(
       const course = await Course.findById(id)
         .populate('coach', 'name empId email')
         .populate('assignedStaff', 'name empId email')
-        .populate('modules')
+        .populate({
+          path: 'modules',
+          populate: { path: 'quiz' },
+        })
         .populate('createdBy', 'name')
         .lean();
 
