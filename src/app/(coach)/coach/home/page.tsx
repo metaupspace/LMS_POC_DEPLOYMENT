@@ -14,6 +14,8 @@ import {
   ChevronRight,
   MapPin,
   RefreshCw,
+  Video,
+  CheckCircle2,
 } from 'lucide-react';
 import { Card, Badge, Button } from '@/components/ui';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
@@ -40,6 +42,36 @@ function isFutureDay(dateStr: string, reference: Date): boolean {
   const refStart = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate());
   const dStart = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   return dStart.getTime() > refStart.getTime();
+}
+
+/** Derive display status based on current time vs session date+timeSlot+duration. */
+function getDisplayStatus(session: SessionData): 'upcoming' | 'ongoing' | 'completed' | 'cancelled' {
+  if (session.status === 'cancelled') return 'cancelled';
+  if (session.status === 'completed') return 'completed';
+
+  const sessionDate = new Date(session.date);
+  const parts = (session.timeSlot ?? '').split(':');
+  const hours = Number(parts[0]);
+  const minutes = Number(parts[1]);
+  if (!isNaN(hours) && !isNaN(minutes)) {
+    sessionDate.setHours(hours, minutes, 0, 0);
+  }
+
+  const now = Date.now();
+  const startTime = sessionDate.getTime();
+  const endTime = startTime + (session.duration ?? 0) * 60 * 1000;
+
+  if (now >= endTime) return 'completed';
+  if (now >= startTime) return 'ongoing';
+  return 'upcoming';
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
 }
 
 function formatCountdown(totalSeconds: number): string {
@@ -283,14 +315,21 @@ function SessionCard({ session }: SessionCardProps) {
 
         {/* Location + Time */}
         <div className="mt-sm flex items-center gap-xs text-body-md text-text-secondary">
-          <MapPin className="h-4 w-4 flex-shrink-0" />
+          {session.mode === 'online' ? (
+            <Video className="h-4 w-4 flex-shrink-0" />
+          ) : (
+            <MapPin className="h-4 w-4 flex-shrink-0" />
+          )}
           <span className="truncate">
-            {session.location} &mdash; {session.timeSlot}
+            {session.mode === 'online' ? 'Online' : session.location} &mdash; {session.timeSlot}
           </span>
         </div>
 
         {/* Badges row */}
         <div className="mt-md flex flex-wrap items-center gap-sm">
+          {session.mode === 'online' && (
+            <Badge variant="info">Online</Badge>
+          )}
           <Badge variant="info">
             <Clock className="mr-[4px] inline h-3 w-3" />
             {session.duration} min
@@ -344,8 +383,10 @@ function SessionCard({ session }: SessionCardProps) {
         {/* Expanded Details */}
         {expanded && (
           <div className="mt-md space-y-md border-t border-border-light pt-md">
-            {session.description && (
+            <h4 className='text-body-md font-semibold text-text-primary'>Description:</h4>
+            {session.description && (<>
               <p className="text-body-md text-text-secondary">{session.description}</p>
+              </>
             )}
             <div>
               <h4 className="text-body-md font-semibold text-text-primary">Enrolled Staff</h4>
@@ -357,9 +398,9 @@ function SessionCard({ session }: SessionCardProps) {
                     return (
                       <li
                         key={id}
-                        className="flex items-center gap-sm rounded-sm bg-surface-background px-sm py-xs text-caption text-text-secondary"
+                        className="flex items-center gap-sm rounded-sm bg-surface-background px-sm py-sm text-text-secondary"
                       >
-                        <Users className="h-3 w-3 flex-shrink-0" />
+                        <Users className="h-4 w-4 flex-shrink-0" />
                         {label}
                       </li>
                     );
@@ -403,6 +444,9 @@ function CompactSessionCard({ session }: CompactSessionCardProps) {
         <div className="mt-[2px] flex items-center gap-xs text-caption text-text-secondary">
           <Clock className="h-3 w-3 flex-shrink-0" />
           <span className="truncate">{session.timeSlot}</span>
+          {session.mode === 'online' && (
+            <Badge variant="info">Online</Badge>
+          )}
         </div>
         <div className="mt-[2px] flex items-center gap-xs text-caption text-text-secondary">
           <Users className="h-3 w-3 flex-shrink-0" />
@@ -412,6 +456,49 @@ function CompactSessionCard({ session }: CompactSessionCardProps) {
 
       {/* Chevron */}
       <ChevronRight className="h-5 w-5 flex-shrink-0 text-text-disabled" />
+    </Card>
+  );
+}
+
+// ─── Completed Session Card ──────────────────────────────
+
+interface CompletedSessionCardProps {
+  session: SessionData;
+}
+
+function CompletedSessionCard({ session }: CompletedSessionCardProps) {
+  const attendedCount = session.attendance.filter((a) => a.status === 'present').length;
+  const totalEnrolled = session.enrolledStaff.length;
+
+  return (
+    <Card className="flex items-center gap-md">
+      {/* Date badge */}
+      <div className="flex h-12 w-12 flex-shrink-0 flex-col items-center justify-center rounded-md bg-success/10">
+        <span className="text-caption font-semibold text-success leading-none">
+          {new Intl.DateTimeFormat('en-IN', { day: 'numeric' }).format(new Date(session.date))}
+        </span>
+        <span className="text-[10px] font-medium text-success uppercase leading-tight">
+          {new Intl.DateTimeFormat('en-IN', { month: 'short' }).format(new Date(session.date))}
+        </span>
+      </div>
+
+      {/* Details */}
+      <div className="min-w-0 flex-1">
+        <h4 className="text-body-md font-semibold text-text-primary truncate">
+          {session.title}
+        </h4>
+        <div className="mt-[2px] flex items-center gap-xs text-caption text-text-secondary">
+          <Clock className="h-3 w-3 flex-shrink-0" />
+          <span className="truncate">{formatDate(session.date)} &mdash; {session.timeSlot}</span>
+        </div>
+        <div className="mt-[2px] flex items-center gap-xs text-caption text-text-secondary">
+          <CheckCircle2 className="h-3 w-3 flex-shrink-0 text-success" />
+          <span>{attendedCount}/{totalEnrolled} attended</span>
+        </div>
+      </div>
+
+      {/* Completed badge */}
+      <Badge variant="success">Completed</Badge>
     </Card>
   );
 }
@@ -430,29 +517,61 @@ export default function CoachHome() {
     },
     { skip: !user?.id }
   );
-
   const today = useMemo(() => new Date(), []);
+
+  // Auto-refresh every 60s so status transitions happen live
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setTick((t) => t + 1), 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const sessions = useMemo(() => sessionsResponse?.data ?? [], [sessionsResponse]);
 
+  const getInstructorId = (instructor: SessionData['instructor']): string | null => {
+    if (!instructor) return null;
+    if (typeof instructor === 'string') return instructor;
+    return instructor._id;
+  };
+
+  // Today's sessions: only upcoming or ongoing (not completed/cancelled)
   const todaySessions = useMemo(
     () =>
+      sessions.filter((s) => {
+        if (!isSameDay(s.date, today)) return false;
+        if (getInstructorId(s.instructor) !== user?.id) return false;
+        const ds = getDisplayStatus(s);
+        return ds === 'upcoming' || ds === 'ongoing';
+      }),
+    [sessions, today, user?.id, tick]
+  );
+
+  // Future sessions that haven't started
+  const upcomingSessions = useMemo(
+    () =>
       sessions.filter(
-        (s) => isSameDay(s.date, today) && s.instructor === user?.id
+        (s) => isFutureDay(s.date, today) && getInstructorId(s.instructor) === user?.id
       ),
     [sessions, today, user?.id]
   );
 
-  const upcomingSessions = useMemo(
+  // All completed sessions (any date, including today)
+  const completedSessions = useMemo(
     () =>
-      sessions.filter(
-        (s) => isFutureDay(s.date, today) && s.instructor === user?.id
-      ),
-    [sessions, today, user?.id]
+      sessions
+        .filter(
+          (s) =>
+            getInstructorId(s.instructor) === user?.id &&
+            getDisplayStatus(s) === 'completed'
+        )
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    [sessions, user?.id, tick]
   );
 
   const upcomingPreview = upcomingSessions.slice(0, 5);
   const hasMoreUpcoming = upcomingSessions.length > 5;
+  const completedPreview = completedSessions.slice(0, 5);
+  const hasMoreCompleted = completedSessions.length > 5;
 
   // ── Loading state ──
   if (isLoading) {
@@ -467,17 +586,36 @@ export default function CoachHome() {
 
   return (
     <div className="space-y-xl">
-      {/* ── Today's Sessions ── */}
+      {/* ── Live Now (ongoing today) ── */}
+      {todaySessions.some((s) => getDisplayStatus(s) === 'ongoing') && (
+        <section>
+          <h2 className="text-h2 text-text-primary flex items-center gap-sm">
+            <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
+            Live Now
+          </h2>
+          <div className="mt-md space-y-md">
+            {todaySessions
+              .filter((s) => getDisplayStatus(s) === 'ongoing')
+              .map((session) => (
+                <SessionCard key={session._id} session={session} />
+              ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── Today's Upcoming Sessions ── */}
       <section>
         <h2 className="text-h2 text-text-primary">Today&apos;s Sessions</h2>
 
-        {todaySessions.length > 0 ? (
+        {todaySessions.filter((s) => getDisplayStatus(s) === 'upcoming').length > 0 ? (
           <div className="mt-md space-y-md">
-            {todaySessions.map((session) => (
-              <SessionCard key={session._id} session={session} />
-            ))}
+            {todaySessions
+              .filter((s) => getDisplayStatus(s) === 'upcoming')
+              .map((session) => (
+                <SessionCard key={session._id} session={session} />
+              ))}
           </div>
-        ) : (
+        ) : !todaySessions.some((s) => getDisplayStatus(s) === 'ongoing') ? (
           <div className="mt-md flex flex-col items-center justify-center rounded-md bg-surface-white py-2xl px-lg text-center shadow-sm">
             <CalendarX className="h-12 w-12 text-text-disabled" />
             <p className="mt-md text-body-lg font-medium text-text-secondary">
@@ -487,7 +625,7 @@ export default function CoachHome() {
               Your scheduled sessions will appear here
             </p>
           </div>
-        )}
+        ) : null}
       </section>
 
       {/* ── Upcoming Sessions ── */}
@@ -519,6 +657,29 @@ export default function CoachHome() {
           </div>
         )}
       </section>
+
+      {/* ── Completed Sessions ── */}
+      {completedPreview.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between">
+            <h2 className="text-h2 text-text-primary">Completed Sessions</h2>
+            {hasMoreCompleted && (
+              <button
+                type="button"
+                className="text-body-md font-semibold text-primary-main min-h-[44px] flex items-center"
+              >
+                View All
+              </button>
+            )}
+          </div>
+
+          <div className="mt-md space-y-sm">
+            {completedPreview.map((session) => (
+              <CompletedSessionCard key={session._id} session={session} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

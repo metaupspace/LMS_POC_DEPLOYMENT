@@ -17,10 +17,13 @@ export const GET = withAuth(
       const { searchParams } = new URL(request.url);
       const { page, limit } = getPaginationParams(searchParams);
       const unreadOnly = searchParams.get('unreadOnly') === 'true';
+      const readParam = searchParams.get('read');
 
       const filter: FilterQuery<INotification> = { user: currentUserId };
-      if (unreadOnly) {
+      if (unreadOnly || readParam === 'false') {
         filter.read = false;
+      } else if (readParam === 'true') {
+        filter.read = true;
       }
 
       const skip = (page - 1) * limit;

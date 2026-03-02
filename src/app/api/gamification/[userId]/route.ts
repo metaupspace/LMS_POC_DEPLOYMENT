@@ -2,9 +2,10 @@ import { type NextRequest } from 'next/server';
 import { connectDB } from '@/lib/db/connect';
 import Gamification from '@/lib/db/models/Gamification';
 import LearnerProgress from '@/lib/db/models/LearnerProgress';
+import TrainingSession from '@/lib/db/models/TrainingSession';
 import { withAuth } from '@/lib/auth/rbac';
 import { successResponse, errorResponse } from '@/lib/utils/apiResponse';
-import { BADGE_TIERS } from '@/lib/constants';
+import { BADGE_TIERS, POINTS } from '@/lib/constants';
 
 // GET /api/gamification/[userId]
 export const GET = withAuth(
@@ -35,15 +36,23 @@ export const GET = withAuth(
         }
       }
 
-      // Reconcile: check if gamification points are in sync with LearnerProgress
+      // Reconcile: check if gamification points are in sync with LearnerProgress + session attendance
       const progressRecords = await LearnerProgress.find({ user: userId })
         .select('videoPoints quizPoints proofOfWorkPoints')
         .lean();
 
-      const totalEarnedPoints = progressRecords.reduce(
+      const modulePoints = progressRecords.reduce(
         (sum, p) => sum + (p.videoPoints || 0) + (p.quizPoints || 0) + (p.proofOfWorkPoints || 0),
         0
       );
+
+      // Count sessions where user marked attendance as present
+      const attendedSessionCount = await TrainingSession.countDocuments({
+        'attendance.staff': userId,
+        'attendance.status': 'present',
+      });
+
+      const totalEarnedPoints = modulePoints + attendedSessionCount * POINTS.SESSION_ATTENDANCE;
 
       if (gamification.totalPoints < totalEarnedPoints) {
         // Points are out of sync — repair

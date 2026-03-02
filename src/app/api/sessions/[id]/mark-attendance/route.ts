@@ -1,9 +1,11 @@
 import { type NextRequest } from 'next/server';
 import { connectDB } from '@/lib/db/connect';
 import TrainingSession from '@/lib/db/models/TrainingSession';
+import Gamification from '@/lib/db/models/Gamification';
 import { withAuth } from '@/lib/auth/rbac';
 import { markAttendanceSchema } from '@/lib/validators/session';
 import { successResponse, errorResponse } from '@/lib/utils/apiResponse';
+import { POINTS, BADGE_TIERS } from '@/lib/constants';
 
 // POST /api/sessions/[id]/mark-attendance
 export const POST = withAuth(
@@ -57,6 +59,34 @@ export const POST = withAuth(
       });
 
       await session.save();
+
+      // Award session attendance points
+      let gamification = await Gamification.findOne({ user: currentUserId });
+      if (!gamification) {
+        gamification = new Gamification({
+          user: currentUserId,
+          totalPoints: 0,
+          badges: [],
+          streak: { current: 0, longest: 0 },
+        });
+      }
+
+      gamification.totalPoints += POINTS.SESSION_ATTENDANCE;
+
+      // Check badge thresholds
+      for (const tier of BADGE_TIERS) {
+        const alreadyHas = gamification.badges.some((b) => b.name === tier.name);
+        if (!alreadyHas && gamification.totalPoints >= tier.threshold) {
+          gamification.badges.push({
+            name: tier.name,
+            threshold: tier.threshold,
+            earnedAt: new Date(),
+            icon: tier.icon,
+          });
+        }
+      }
+
+      await gamification.save();
 
       return successResponse(null, 'Attendance marked successfully');
     } catch (err) {

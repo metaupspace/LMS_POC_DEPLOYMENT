@@ -4,6 +4,7 @@ import TrainingSession from '@/lib/db/models/TrainingSession';
 import { withAuth } from '@/lib/auth/rbac';
 import { updateSessionSchema } from '@/lib/validators/session';
 import { successResponse, errorResponse } from '@/lib/utils/apiResponse';
+import { syncSessionStatus } from '@/lib/utils/syncSessionStatus';
 
 // GET /api/sessions/[id]
 export const GET = withAuth(
@@ -22,6 +23,10 @@ export const GET = withAuth(
       if (!session) {
         return errorResponse('Session not found', 404);
       }
+
+      // Sync status before returning
+      const computed = await syncSessionStatus(session);
+      session.status = computed;
 
       return successResponse(session, 'Session retrieved successfully');
     } catch (err) {

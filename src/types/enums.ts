@@ -24,11 +24,19 @@ export type CourseStatus = (typeof CourseStatus)[keyof typeof CourseStatus];
 
 export const SessionStatus = {
   UPCOMING: 'upcoming',
+  ONGOING: 'ongoing',
   COMPLETED: 'completed',
   CANCELLED: 'cancelled',
 } as const;
 
 export type SessionStatus = (typeof SessionStatus)[keyof typeof SessionStatus];
+
+export const SessionMode = {
+  OFFLINE: 'offline',
+  ONLINE: 'online',
+} as const;
+
+export type SessionMode = (typeof SessionMode)[keyof typeof SessionMode];
 
 export const AttendanceStatus = {
   PRESENT: 'present',

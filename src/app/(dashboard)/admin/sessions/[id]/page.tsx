@@ -16,6 +16,8 @@ import {
   XCircle,
   Copy,
   Check,
+  Video,
+  Link as LinkIcon,
 } from 'lucide-react';
 
 import {
@@ -50,11 +52,33 @@ type BadgeVariant = 'success' | 'warning' | 'error' | 'info' | 'default';
 
 const statusVariantMap: Record<string, BadgeVariant> = {
   upcoming: 'warning',
+  ongoing: 'info',
   completed: 'success',
   cancelled: 'error',
 };
 
 // ─── Helpers ────────────────────────────────────────────────
+
+/** Derive a display status based on current time vs session date+timeSlot+duration. */
+function getDisplayStatus(session: { status: string; date: string; timeSlot: string; duration?: number }): string {
+  if (session.status !== 'upcoming') return session.status;
+
+  const sessionDate = new Date(session.date);
+  const parts = (session.timeSlot ?? '').split(':');
+  const hours = Number(parts[0]);
+  const minutes = Number(parts[1]);
+  if (!isNaN(hours) && !isNaN(minutes)) {
+    sessionDate.setHours(hours, minutes, 0, 0);
+  }
+
+  const now = Date.now();
+  const startTime = sessionDate.getTime();
+  const endTime = startTime + (session.duration ?? 0) * 60 * 1000;
+
+  if (now >= endTime) return 'completed';
+  if (now >= startTime) return 'ongoing';
+  return 'upcoming';
+}
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
@@ -143,6 +167,8 @@ export default function SessionDetailPage() {
     date: '',
     timeSlot: '',
     duration: 0,
+    mode: 'offline' as 'offline' | 'online',
+    meetingLink: '',
     instructor: '',
   });
   const [selectedStaffIds, setSelectedStaffIds] = useState<Set<string>>(new Set());
@@ -159,6 +185,8 @@ export default function SessionDetailPage() {
       date: session.date ? new Date(session.date).toISOString().split('T')[0]! : '',
       timeSlot: session.timeSlot || '',
       duration: session.duration || 0,
+      mode: session.mode || 'offline',
+      meetingLink: session.meetingLink || '',
       instructor: getPopulatedId(session.instructor),
     });
     // Pre-populate enrolled staff IDs
@@ -187,6 +215,8 @@ export default function SessionDetailPage() {
           date: editForm.date,
           timeSlot: editForm.timeSlot,
           duration: editForm.duration,
+          mode: editForm.mode,
+          meetingLink: editForm.mode === 'online' ? editForm.meetingLink : '',
           instructor: editForm.instructor || undefined,
           enrolledStaff: Array.from(selectedStaffIds),
         },
@@ -465,6 +495,32 @@ export default function SessionDetailPage() {
               />
             </div>
 
+            {/* Session Mode & Meeting Link */}
+            <div className="grid grid-cols-1 gap-lg md:grid-cols-2">
+              <Dropdown
+                label="Session Mode"
+                items={[
+                  { label: 'Offline (In-person)', value: 'offline' },
+                  { label: 'Online (Virtual)', value: 'online' },
+                ]}
+                value={editForm.mode}
+                onChange={(val) => setEditForm((prev) => ({
+                  ...prev,
+                  mode: val as 'offline' | 'online',
+                  meetingLink: val === 'offline' ? '' : prev.meetingLink,
+                }))}
+                placeholder="Select mode"
+              />
+              {editForm.mode === 'online' && (
+                <Input
+                  label="Meeting Link"
+                  placeholder="https://meet.google.com/..."
+                  value={editForm.meetingLink}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, meetingLink: e.target.value }))}
+                />
+              )}
+            </div>
+
             {/* Instructor */}
             <Dropdown
               label="Instructor"
@@ -603,14 +659,42 @@ export default function SessionDetailPage() {
                 </div>
 
                 <div className="flex items-center gap-sm">
+                  <Video className="h-4 w-4 text-text-secondary" />
+                  <div>
+                    <p className="text-caption text-text-secondary">Mode</p>
+                    <Badge variant={session.mode === 'online' ? 'info' : 'default'}>
+                      {session.mode === 'online' ? 'Online' : 'Offline'}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-sm">
                   <div>
                     <p className="text-caption text-text-secondary">Status</p>
-                    <Badge variant={statusVariantMap[session.status] ?? 'default'}>
-                      {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
+                    <Badge variant={statusVariantMap[getDisplayStatus(session)] ?? 'default'}>
+                      {getDisplayStatus(session).charAt(0).toUpperCase() + getDisplayStatus(session).slice(1)}
                     </Badge>
                   </div>
                 </div>
               </div>
+
+              {/* Meeting Link (online sessions) */}
+              {session.mode === 'online' && session.meetingLink && (
+                <div className="flex items-center gap-sm">
+                  <LinkIcon className="h-4 w-4 text-text-secondary" />
+                  <div>
+                    <p className="text-caption text-text-secondary">Meeting Link</p>
+                    <a
+                      href={session.meetingLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-body-md font-medium text-primary-main hover:underline break-all"
+                    >
+                      {session.meetingLink}
+                    </a>
+                  </div>
+                </div>
+              )}
 
               {/* Instructor */}
               <div>

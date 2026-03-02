@@ -4,6 +4,7 @@ import type {
   UserStatus,
   CourseStatus,
   SessionStatus,
+  SessionMode,
   AttendanceStatus,
   LearnerProgressStatus,
   ProofOfWorkStatus,
@@ -127,6 +128,8 @@ export interface ITrainingSession extends Document {
   attendanceCode: string;
   attendanceCodeExpiresAt: Date;
   attendance: IAttendanceRecord[];
+  mode: SessionMode;
+  meetingLink: string;
   status: SessionStatus;
   createdBy: Types.ObjectId;
   createdAt: Date;

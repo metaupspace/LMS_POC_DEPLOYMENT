@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Users,
@@ -72,6 +73,25 @@ const statCards: StatCardConfig[] = [
   },
 ];
 
+function getDisplayStatus(session: { status: string; date: string; timeSlot: string; duration?: number }): string {     
+      if (session.status !== 'upcoming') return session.status;                                                                                                                                                                                     
+      const sessionDate = new Date(session.date);                                                                           
+      const parts = (session.timeSlot ?? '').split(':');                                                                    
+      const hours = Number(parts[0]);                                                                                       
+      const minutes = Number(parts[1]);                                                                                     
+      if (!isNaN(hours) && !isNaN(minutes)) {                                                                               
+        sessionDate.setHours(hours, minutes, 0, 0);                                                                         
+      }                                                                                                                     
+                                                                                                                             
+      const now = Date.now();                                                                                               
+      const startTime = sessionDate.getTime();                                                                              
+      const endTime = startTime + (session.duration ?? 0) * 60 * 1000;                                                      
+                                                                                                                        
+      if (now >= endTime) return 'completed';                                                                               
+      if (now >= startTime) return 'ongoing';                                                                               
+      return 'upcoming';                                                                                                    
+    }  
+
 // ─── Relative Time Helper ───────────────────────────────
 
 function getRelativeTime(dateStr: string): string {
@@ -126,8 +146,7 @@ export default function DashboardHome() {
     data: sessionsResponse,
     isLoading: sessionsLoading,
   } = useGetSessionsQuery({
-    limit: 3,
-    status: 'upcoming',
+    limit: 50,
     sortBy: 'date',
     sortOrder: 'asc',
   });
@@ -136,14 +155,23 @@ export default function DashboardHome() {
     data: notificationsResponse,
     isLoading: notificationsLoading,
   } = useGetNotificationsQuery({
-    limit: 10,
+    limit: 50,
     sortBy: 'createdAt',
     sortOrder: 'desc',
   });
 
+  // Auto-refresh every 60s so upcoming sessions list updates live
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setTick((t) => t + 1), 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   const stats = statsResponse?.data;
-  const sessions = sessionsResponse?.data ?? [];
+  const allSessions = sessionsResponse?.data ?? [];
   const notifications = notificationsResponse?.data ?? [];
+
+  const sessions = allSessions.filter((s) => getDisplayStatus(s) === 'upcoming').slice(0, 3);
 
   // Filter stat cards based on role
   const visibleStatCards = statCards.filter(

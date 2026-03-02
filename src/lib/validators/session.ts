@@ -18,6 +18,8 @@ export const createSessionSchema = z.object({
     .number({ required_error: 'Duration is required' })
     .int()
     .positive('Duration must be positive'),
+  mode: z.enum(['offline', 'online']).optional().default('offline'),
+  meetingLink: z.string().trim().optional().default(''),
   thumbnail: z.string().optional().default(''),
   instructor: z.string({ required_error: 'Instructor is required' }),
   enrolledStaff: z.array(z.string()).optional().default([]),
@@ -31,9 +33,11 @@ export const updateSessionSchema = z.object({
   date: z.coerce.date().optional(),
   timeSlot: z.string().trim().optional(),
   duration: z.number().int().positive().optional(),
+  mode: z.enum(['offline', 'online']).optional(),
+  meetingLink: z.string().trim().optional(),
   thumbnail: z.string().optional(),
   instructor: z.string().optional(),
-  status: z.enum(['upcoming', 'completed', 'cancelled']).optional(),
+  status: z.enum(['upcoming', 'ongoing', 'completed', 'cancelled']).optional(),
   enrolledStaff: z.array(z.string()).optional(),
 });
 

@@ -5,6 +5,7 @@ import { withAuth } from '@/lib/auth/rbac';
 import { createSessionSchema } from '@/lib/validators/session';
 import { successResponse, errorResponse, paginatedResponse } from '@/lib/utils/apiResponse';
 import { getPaginationParams, buildPaginationMeta } from '@/lib/utils/pagination';
+import { syncAllSessionStatuses } from '@/lib/utils/syncSessionStatus';
 import type { FilterQuery } from 'mongoose';
 import type { ITrainingSession } from '@/types';
 
@@ -13,6 +14,9 @@ export const GET = withAuth(
   async (request: NextRequest) => {
     try {
       await connectDB();
+
+      // Sync stale statuses before querying
+      await syncAllSessionStatuses();
 
       const { searchParams } = new URL(request.url);
       const { page, limit, search, sortBy, sortOrder } = getPaginationParams(searchParams);
@@ -63,6 +67,7 @@ export const GET = withAuth(
       const [sessions, total] = await Promise.all([
         TrainingSession.find(filter)
           .populate('instructor', 'name empId')
+          .populate('enrolledStaff', 'name empId')
           .sort({ [sortField]: sortDir })
           .skip(skip)
           .limit(limit)

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
@@ -17,6 +17,8 @@ import {
   Timer,
   Circle,
   ClipboardList,
+  Video,
+  ExternalLink,
 } from 'lucide-react';
 import { Card, Badge, Button } from '@/components/ui';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
@@ -57,6 +59,25 @@ function isSameDay(dateStr: string, reference: Date): boolean {
     d.getMonth() === reference.getMonth() &&
     d.getDate() === reference.getDate()
   );
+}
+
+/** Derive display status based on current time vs session date+timeSlot+duration. */
+function getSessionDisplayStatus(session: SessionData): 'upcoming' | 'ongoing' | 'completed' {
+  if (session.status === 'completed') return 'completed';
+
+  const sessionDate = new Date(session.date);
+  const [hours, minutes] = (session.timeSlot ?? '').split(':').map(Number);
+  if (!isNaN(hours) && !isNaN(minutes)) {
+    sessionDate.setHours(hours, minutes, 0, 0);
+  }
+
+  const now = Date.now();
+  const startTime = sessionDate.getTime();
+  const endTime = startTime + (session.duration ?? 0) * 60 * 1000;
+
+  if (now >= endTime) return 'completed';
+  if (now >= startTime) return 'ongoing';
+  return 'upcoming';
 }
 
 function isPastDate(dateStr: string, reference: Date): boolean {
@@ -428,7 +449,10 @@ function SessionUpcomingCard({ session, userId, isToday }: SessionUpcomingCardPr
   const [markAttendance, { isLoading: isMarking }] = useMarkAttendanceMutation();
 
   const userAttendance = useMemo(
-    () => session.attendance.find((a) => a.staff === userId),
+    () =>
+      session.attendance.find(
+        (a) => (typeof a.staff === 'string' ? a.staff : a.staff._id) === userId
+      ),
     [session.attendance, userId]
   );
   const isPresent = userAttendance?.status === 'present';
@@ -448,7 +472,7 @@ function SessionUpcomingCard({ session, userId, isToday }: SessionUpcomingCardPr
       }).unwrap();
 
       dispatch(
-        addToast({ type: 'success', message: 'Attendance marked successfully!', duration: 3000 })
+        addToast({ type: 'success', message: 'Attendance marked successfully! +30 points', duration: 3000 })
       );
       setAttendanceCode('');
     } catch {
@@ -476,11 +500,16 @@ function SessionUpcomingCard({ session, userId, isToday }: SessionUpcomingCardPr
             <CalendarDays className="h-10 w-10 text-primary-main opacity-50" />
           </div>
         )}
-        {isToday && (
-          <div className="absolute top-sm right-sm">
-            <Badge variant="warning">Today</Badge>
-          </div>
-        )}
+        {(() => {
+          const ds = getSessionDisplayStatus(session);
+          if (ds === 'ongoing') return (
+            <div className="absolute top-sm right-sm"><Badge variant="info">Ongoing</Badge></div>
+          );
+          if (isToday) return (
+            <div className="absolute top-sm right-sm"><Badge variant="warning">Today</Badge></div>
+          );
+          return null;
+        })()}
       </div>
 
       <div className="p-lg">
@@ -495,10 +524,19 @@ function SessionUpcomingCard({ session, userId, isToday }: SessionUpcomingCardPr
           <span>{formatDate(session.date)} &mdash; {session.timeSlot}</span>
         </div>
 
-        {/* Location */}
+        {/* Location / Online */}
         <div className="mt-xs flex items-center gap-xs text-body-md text-text-secondary">
-          <MapPin className="h-4 w-4 flex-shrink-0" />
-          <span className="truncate">{session.location}</span>
+          {session.mode === 'online' ? (
+            <>
+              <Video className="h-4 w-4 flex-shrink-0" />
+              <Badge variant="info">Online</Badge>
+            </>
+          ) : (
+            <>
+              <MapPin className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">{session.location}</span>
+            </>
+          )}
         </div>
 
         {/* Duration */}
@@ -507,6 +545,19 @@ function SessionUpcomingCard({ session, userId, isToday }: SessionUpcomingCardPr
           <span>{session.duration} min</span>
         </div>
 
+        {/* Join Now button for online sessions */}
+        {session.mode === 'online' && session.meetingLink && (isToday || getSessionDisplayStatus(session) === 'ongoing') && (
+          <a
+            href={session.meetingLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-md flex items-center justify-center gap-sm rounded-sm bg-blue-600 px-md py-[10px] text-body-md font-semibold text-white transition-colors hover:bg-blue-700 min-h-[44px]"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Join Now
+          </a>
+        )}
+
         {/* Attendance section */}
         <div className="mt-md">
           {isPresent ? (
@@ -514,7 +565,7 @@ function SessionUpcomingCard({ session, userId, isToday }: SessionUpcomingCardPr
               <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
               <Badge variant="success">Present</Badge>
             </div>
-          ) : isToday ? (
+          ) : isToday || getSessionDisplayStatus(session) === 'ongoing' ? (
             <div className="space-y-sm">
               <input
                 type="text"
@@ -566,7 +617,10 @@ interface SessionPastCardProps {
 
 function SessionPastCard({ session, userId }: SessionPastCardProps) {
   const userAttendance = useMemo(
-    () => session.attendance.find((a) => a.staff === userId),
+    () =>
+      session.attendance.find(
+        (a) => (typeof a.staff === 'string' ? a.staff : a.staff._id) === userId
+      ),
     [session.attendance, userId]
   );
   const isPresent = userAttendance?.status === 'present';
@@ -603,6 +657,13 @@ function SessionPastCard({ session, userId }: SessionPastCardProps) {
 export default function MyLearning() {
   const user = useAppSelector((s) => s.auth.user);
   const [activeTab, setActiveTab] = useState<TabKey>('ongoing');
+
+  // Auto-refresh every 60s so session status badges update live
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setTick((t) => t + 1), 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   // ── Queries ──
   const { data: sessionsResponse, isLoading: isLoadingSessions } = useGetSessionsQuery(
@@ -693,7 +754,13 @@ export default function MyLearning() {
 
   // ── Sessions: filter where user is enrolled ──
   const userSessions = useMemo(() => {
-    return sessions.filter((s) => user?.id && s.enrolledStaff.includes(user.id));
+    return sessions.filter(
+      (s) =>
+        user?.id &&
+        s.enrolledStaff.some(
+          (staff) => (typeof staff === 'string' ? staff : staff._id) === user.id
+        )
+    );
   }, [sessions, user?.id]);
 
   const upcomingSessions = useMemo(() => {

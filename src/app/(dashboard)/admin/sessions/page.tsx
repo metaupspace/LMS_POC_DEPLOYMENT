@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Plus, CalendarDays, LayoutGrid, MapPin, Clock } from 'lucide-react';
@@ -20,7 +20,6 @@ import {
   useGetSessionsQuery,
   type SessionData,
 } from '@/store/slices/api/sessionApi';
-import type { SessionStatus } from '@/types';
 import { useTranslation } from '@/i18n';
 
 // ─── Constants ──────────────────────────────────────────────
@@ -28,6 +27,7 @@ import { useTranslation } from '@/i18n';
 const STATUS_OPTIONS = [
   { label: 'All', value: '' },
   { label: 'Upcoming', value: 'upcoming' },
+  { label: 'Ongoing', value: 'ongoing' },
   { label: 'Completed', value: 'completed' },
   { label: 'Cancelled', value: 'cancelled' },
 ];
@@ -40,6 +40,7 @@ type BadgeVariant = 'success' | 'warning' | 'error' | 'info' | 'default';
 
 const statusVariantMap: Record<string, BadgeVariant> = {
   upcoming: 'warning',
+  ongoing: 'info',
   completed: 'success',
   cancelled: 'error',
 };
@@ -55,6 +56,27 @@ function formatDate(dateStr: string): string {
   });
 }
 
+/** Derive a display status based on current time vs session date+timeSlot+duration. */
+function getDisplayStatus(session: SessionData): string {
+  if (session.status !== 'upcoming') return session.status;
+
+  const sessionDate = new Date(session.date);
+  const parts = (session.timeSlot ?? '').split(':');
+  const hours = Number(parts[0]);
+  const minutes = Number(parts[1]);
+  if (!isNaN(hours) && !isNaN(minutes)) {
+    sessionDate.setHours(hours, minutes, 0, 0);
+  }
+
+  const now = Date.now();
+  const startTime = sessionDate.getTime();
+  const endTime = startTime + (session.duration ?? 0) * 60 * 1000;
+
+  if (now >= endTime) return 'completed';
+  if (now >= startTime) return 'ongoing';
+  return 'upcoming';
+}
+
 // ─── Component ──────────────────────────────────────────────
 
 export default function SessionsListPage() {
@@ -67,38 +89,54 @@ export default function SessionsListPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
 
+  // Auto-refresh every 60s so status transitions happen live
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setTick((t) => t + 1), 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   // ── Calendar day selection ──────────────────────────────
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   // ── Query ───────────────────────────────────────────────
+  // Fetch all sessions (no server-side status filter) so we can filter by computed display status
   const { data, isLoading, isFetching } = useGetSessionsQuery({
-    page,
-    limit: LIMIT,
+    limit: 200,
     search: search || undefined,
-    status: (status || undefined) as SessionStatus | undefined,
     sortBy: 'date',
     sortOrder: 'desc',
   });
 
-  // For calendar, fetch all sessions (larger limit, no pagination)
-  const { data: allSessionsData } = useGetSessionsQuery(
-    { limit: 200, sortBy: 'date', sortOrder: 'desc' },
-    { skip: viewMode !== 'calendar' }
-  );
+  const allFetchedSessions = useMemo(() => data?.data ?? [], [data]);
 
-  const sessions = data?.data ?? [];
-  const pagination = data?.pagination;
+  // Filter by computed display status on the frontend
+  const statusFilteredSessions = useMemo(() => {
+    if (!status) return allFetchedSessions;
+    return allFetchedSessions.filter((s) => getDisplayStatus(s) === status);
+  }, [allFetchedSessions, status, tick]);
 
-  const allSessions = useMemo(() => allSessionsData?.data ?? [], [allSessionsData]);
+  // Client-side pagination
+  const totalFiltered = statusFilteredSessions.length;
+  const totalPages = Math.ceil(totalFiltered / LIMIT);
+  const sessions = statusFilteredSessions.slice((page - 1) * LIMIT, page * LIMIT);
+  const pagination = totalFiltered > 0
+    ? { total: totalFiltered, totalPages, page, limit: LIMIT }
+    : undefined;
+
+  const allSessions = allFetchedSessions;
 
   // ── Calendar events ─────────────────────────────────────
   const calendarEvents: CalendarEvent[] = useMemo(
     () =>
-      allSessions.map((s) => ({
-        date: s.date.split('T')[0] ?? s.date,
-        title: s.title,
-        status: s.status as CalendarEvent['status'],
-      })),
+      allSessions.map((s) => {
+        const ds = getDisplayStatus(s);
+        return {
+          date: s.date.split('T')[0] ?? s.date,
+          title: s.title,
+          status: (ds === 'ongoing' ? 'upcoming' : ds) as CalendarEvent['status'],
+        };
+      }),
     [allSessions]
   );
 
@@ -307,7 +345,8 @@ interface SessionCardProps {
 }
 
 function SessionCard({ session, onClick }: SessionCardProps) {
-  const statusVariant = statusVariantMap[session.status] ?? 'default';
+  const displayStatus = getDisplayStatus(session);
+  const statusVariant = statusVariantMap[displayStatus] ?? 'default';
 
   return (
     <Card
@@ -363,7 +402,7 @@ function SessionCard({ session, onClick }: SessionCardProps) {
             {session.instructor ? `Instructor assigned` : 'No instructor'}
           </span>
           <Badge variant={statusVariant}>
-            {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
+            {displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
           </Badge>
         </div>
       </div>

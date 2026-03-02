@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Bell } from 'lucide-react';
 import Link from 'next/link';
 import { useGetNotificationsQuery, useMarkAsReadMutation } from '@/store/slices/api/notificationApi';
 import { useAppSelector } from '@/store/hooks';
+import { useNotificationStream } from '@/hooks/useNotificationStream';
 
 const viewAllRoutes: Record<string, string> = {
   admin: '/admin/notifications',
@@ -13,6 +14,19 @@ const viewAllRoutes: Record<string, string> = {
   staff: '/learner/notifications',
 };
 
+function timeAgo(dateStr: string): string {
+  const now = Date.now();
+  const diff = now - new Date(dateStr).getTime();
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 60) return 'Just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 interface NotificationBellProps {
   iconClassName?: string;
 }
@@ -20,8 +34,9 @@ interface NotificationBellProps {
 export default function NotificationBell({ iconClassName = 'text-white' }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const permissionRef = useRef(false);
 
-  const { data } = useGetNotificationsQuery(
+  const { data, refetch } = useGetNotificationsQuery(
     { limit: 5, read: false },
     { pollingInterval: 30000 }
   );
@@ -32,6 +47,46 @@ export default function NotificationBell({ iconClassName = 'text-white' }: Notif
   const notifications = data?.data ?? [];
   const unreadCount = data?.pagination?.total ?? 0;
 
+  // Request browser notification permission on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'granted') {
+        permissionRef.current = true;
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then((perm) => {
+          permissionRef.current = perm === 'granted';
+        });
+      }
+    }
+  }, []);
+
+  // Real-time: when SSE pushes a new notification, refetch + show browser notification
+  const handleNewNotification = useCallback(
+    (notification: Record<string, unknown>) => {
+      refetch();
+
+      // Show browser push notification
+      if (permissionRef.current && typeof window !== 'undefined' && 'Notification' in window) {
+        try {
+          new Notification(
+            (notification.title as string) ?? 'New Notification',
+            {
+              body: (notification.message as string) ?? '',
+              icon: '/icons/icon-192x192.png',
+              tag: 'lms-notification',
+            }
+          );
+        } catch {
+          // Browser doesn't support Notification constructor (e.g., mobile)
+        }
+      }
+    },
+    [refetch]
+  );
+
+  useNotificationStream(handleNewNotification);
+
+  // Close dropdown on outside click
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
@@ -81,6 +136,7 @@ export default function NotificationBell({ iconClassName = 'text-white' }: Notif
                 >
                   <span className="text-body-md font-medium text-text-primary">{n.title}</span>
                   <span className="line-clamp-2 text-caption text-text-secondary">{n.message}</span>
+                  <span className="text-[11px] text-text-disabled">{timeAgo(n.createdAt)}</span>
                 </button>
               ))
             )}

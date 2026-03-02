@@ -38,6 +38,8 @@ const createSessionFormSchema = z.object({
     .number({ required_error: 'Duration is required' })
     .int('Duration must be a whole number')
     .positive('Duration must be positive'),
+  mode: z.enum(['offline', 'online']).optional().default('offline'),
+  meetingLink: z.string().trim().optional().default(''),
   thumbnail: z.string().optional().default(''),
   instructor: z.string({ required_error: 'Instructor is required' }).min(1, 'Instructor is required'),
   enrolledStaff: z.array(z.string()).optional().default([]),
@@ -97,6 +99,8 @@ export default function CreateSessionPage() {
       date: '',
       timeSlot: '',
       duration: undefined,
+      mode: 'offline',
+      meetingLink: '',
       thumbnail: '',
       instructor: '',
       enrolledStaff: [],
@@ -104,6 +108,7 @@ export default function CreateSessionPage() {
   });
 
   const instructorValue = watch('instructor');
+  const modeValue = watch('mode');
 
   // ── Instructor dropdown items ───────────────────────────
   const instructorItems = useMemo(
@@ -127,6 +132,16 @@ export default function CreateSessionPage() {
   );
 
   // ── Handlers ────────────────────────────────────────────
+
+  const handleModeChange = useCallback(
+    (value: string) => {
+      setValue('mode', value as 'offline' | 'online', { shouldValidate: true });
+      if (value === 'offline') {
+        setValue('meetingLink', '');
+      }
+    },
+    [setValue]
+  );
 
   const handleInstructorChange = useCallback(
     (value: string) => {
@@ -189,6 +204,8 @@ export default function CreateSessionPage() {
           date: formData.date,
           timeSlot: formData.timeSlot,
           duration: formData.duration,
+          mode: formData.mode || 'offline',
+          meetingLink: formData.mode === 'online' ? (formData.meetingLink || '') : '',
           thumbnail: formData.thumbnail || undefined,
           instructor: formData.instructor,
           enrolledStaff: formData.enrolledStaff,
@@ -304,6 +321,28 @@ export default function CreateSessionPage() {
               error={errors.duration?.message}
               {...register('duration', { valueAsNumber: true })}
             />
+          </div>
+
+          {/* Session Mode & Meeting Link */}
+          <div className="grid grid-cols-1 gap-lg md:grid-cols-2">
+            <Dropdown
+              label="Session Mode"
+              items={[
+                { label: 'Offline (In-person)', value: 'offline' },
+                { label: 'Online (Virtual)', value: 'online' },
+              ]}
+              value={modeValue ?? 'offline'}
+              onChange={handleModeChange}
+              placeholder="Select mode"
+            />
+            {modeValue === 'online' && (
+              <Input
+                label="Meeting Link"
+                placeholder="https://meet.google.com/..."
+                error={errors.meetingLink?.message}
+                {...register('meetingLink')}
+              />
+            )}
           </div>
 
           {/* Thumbnail */}

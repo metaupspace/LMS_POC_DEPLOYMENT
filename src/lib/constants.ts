@@ -12,6 +12,7 @@ export const POINTS = {
   QUIZ_PASS: 30,
   PROOF_OF_WORK_APPROVED: 30,
   MODULE_COMPLETION_MIN: 60,
+  SESSION_ATTENDANCE: 30,
 } as const;
 
 export const ROLES = {

@@ -31,6 +31,8 @@ export interface SessionData {
   date: string;
   timeSlot: string;
   duration: number;
+  mode: 'offline' | 'online';
+  meetingLink: string;
   thumbnail: string;
   instructor: string | PopulatedUser | null;
   enrolledStaff: (string | PopulatedUser)[];
@@ -63,6 +65,8 @@ export interface CreateSessionBody {
   date: string;
   timeSlot: string;
   duration: number;
+  mode?: 'offline' | 'online';
+  meetingLink?: string;
   thumbnail?: string;
   instructor?: string;
   enrolledStaff?: string[];
@@ -76,6 +80,8 @@ export interface UpdateSessionBody {
   date?: string;
   timeSlot?: string;
   duration?: number;
+  mode?: 'offline' | 'online';
+  meetingLink?: string;
   thumbnail?: string;
   instructor?: string;
   enrolledStaff?: string[];

@@ -1,6 +1,6 @@
 import mongoose, { Schema, type Model } from 'mongoose';
 import type { ITrainingSession } from '@/types';
-import { SessionStatus, AttendanceStatus } from '@/types/enums';
+import { SessionStatus, SessionMode, AttendanceStatus } from '@/types/enums';
 
 const attendanceRecordSchema = new Schema(
   {
@@ -59,6 +59,16 @@ const trainingSessionSchema = new Schema<ITrainingSession>(
       type: Number,
       required: [true, 'Duration is required'],
       min: 1,
+    },
+    mode: {
+      type: String,
+      enum: Object.values(SessionMode),
+      default: SessionMode.OFFLINE,
+    },
+    meetingLink: {
+      type: String,
+      trim: true,
+      default: '',
     },
     thumbnail: {
       type: String,
