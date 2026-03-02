@@ -49,3 +49,6 @@ coverage/
 # Misc
 *.pem
 *.log
+
+*storybook.log
+storybook-static

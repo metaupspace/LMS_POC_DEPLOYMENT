@@ -9,7 +9,9 @@
       "Bash(npx tsc:*)",
       "Bash(find:*)",
       "Bash(cat:*)",
-      "Bash(head:*)"
+      "Bash(head:*)",
+      "Bash(npm install:*)",
+      "Bash(npx storybook@latest:*)"
     ]
   }
 }

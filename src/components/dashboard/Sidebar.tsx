@@ -10,6 +10,7 @@ import {
   BookOpen,
   CalendarDays,
   BarChart3,
+  FileText,
   X,
 } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
@@ -31,6 +32,7 @@ const navItems: NavItem[] = [
   { labelKey: 'courses.courses', href: '/admin/courses', icon: BookOpen, roles: ['admin', 'manager'] },
   { labelKey: 'sessions.trainingSessions', href: '/admin/sessions', icon: CalendarDays, roles: ['admin', 'manager'] },
   { labelKey: 'reports.reports', href: '/admin/reports', icon: BarChart3, roles: ['admin', 'manager'] },
+  { labelKey: 'API Docs', href: '/api-docs', icon: FileText, roles: ['admin'] },
 ];
 
 export default function Sidebar() {
