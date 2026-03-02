@@ -54,6 +54,7 @@ export const POST = withAuth(
       }
 
       gamification.streak.lastActivityDate = new Date();
+      gamification.markModified('streak');
       await gamification.save();
 
       return successResponse(gamification.streak, 'Streak updated');

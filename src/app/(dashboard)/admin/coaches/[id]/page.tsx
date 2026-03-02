@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -16,6 +16,7 @@ import {
   useOnboardUserMutation,
   useResetPasswordMutation,
 } from '@/store/slices/api/userApi';
+import { useGetCoursesQuery, type CourseData } from '@/store/slices/api/courseApi';
 import { updateUserSchema, type UpdateUserInput } from '@/lib/validators/user';
 import { Button, Card, Input, Badge, LoadingSpinner, ConfirmDialog, Modal } from '@/components/ui';
 
@@ -27,6 +28,65 @@ const statusVariantMap: Record<string, StatusVariant> = {
   active: 'success',
   offboarded: 'warning',
 };
+
+
+function SkeletonCourseCard() {
+  return (
+    <div className="rounded-md bg-surface-white shadow-sm overflow-hidden animate-pulse">
+      <div className="h-[160px] w-full bg-border-light" />
+      <div className="p-lg space-y-md">
+        <div className="h-5 w-3/4 rounded-sm bg-border-light" />
+        <div className="h-6 w-20 rounded-full bg-border-light" />
+        <div className="flex gap-lg">
+          <div className="h-4 w-24 rounded-sm bg-border-light" />
+          <div className="h-4 w-20 rounded-sm bg-border-light" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface CourseCardProps {
+  course: CourseData;
+}
+
+function CourseCard({ course }: CourseCardProps) {
+  return (
+      <Card noPadding hoverable className="overflow-hidden active:scale-[0.99] transition-transform">
+        {/* Thumbnail */}
+        <div className="relative h-[160px] w-full bg-surface-background">
+          {course.thumbnail ? (
+            <Image
+              src={course.thumbnail}
+              alt={course.title}
+              fill
+              unoptimized
+              className="object-cover"
+              sizes="100vw"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-primary-light">
+              <BookOpen className="h-12 w-12 text-primary-main opacity-50" strokeWidth={1.5} />
+            </div>
+          )}
+        </div>
+
+        {/* Content */}
+        <div className="p-lg">
+          {/* Title */}
+          <h3 className="text-h3 font-semibold text-text-primary line-clamp-1">
+            {course.title}
+          </h3>
+
+          {/* Domain badge */}
+          <div className="mt-sm">
+            <Badge variant="info">{course.domain}</Badge>
+          </div>
+        </div>
+      </Card>
+  );
+}
+
 
 // ─── Coach Detail Page ────────────────────────────────────
 
@@ -52,6 +112,17 @@ export default function CoachDetailPage() {
 
   const coach = userResponse?.data;
 
+  const { data: coursesResponse, isLoading: isCoursesLoading } = useGetCoursesQuery(
+    {
+      coach: id,
+      limit: 50,
+      status: 'active',
+    },
+    { skip: !id }
+  );
+
+  const courses = useMemo(() => coursesResponse?.data ?? [], [coursesResponse?.data]);
+  
   // Form setup
   const {
     register,
@@ -392,7 +463,7 @@ export default function CoachDetailPage() {
       </Card>
 
       {/* Assigned Courses Section */}
-      {!isEditing && (
+      {!isEditing && !isCoursesLoading ? (
         <Card
           className="max-w-3xl"
           header={
@@ -402,10 +473,21 @@ export default function CoachDetailPage() {
             </div>
           }
         >
-          <p className="text-body-md text-text-secondary">
-            Course data loaded from course assignments
-          </p>
+          {courses.length > 0 ? (
+            <div className="grid grid-cols-1 gap-md sm:grid-cols-2 lg:grid-cols-3">
+              {courses.map((course) => (
+                <CourseCard key={course._id} course={course} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-body-md text-text-secondary">This coach is not currently assigned to any courses.</p>
+          )}
         </Card>
+      ) : (
+        <div className="max-w-3xl space-y-md">
+          <SkeletonCourseCard />
+          <SkeletonCourseCard />
+        </div>
       )}
 
       {/* Confirm Dialogs */}

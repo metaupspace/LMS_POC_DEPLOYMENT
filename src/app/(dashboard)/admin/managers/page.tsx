@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Plus, RefreshCw } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { addToast, openModal, closeModal } from '@/store/slices/uiSlice';
+import { Eye, UserX, Trash2 } from 'lucide-react';
 import {
   useGetUsersQuery,
   useDeleteUserMutation,
@@ -208,7 +209,7 @@ export default function ManagersListPage() {
               router.push(`/admin/managers/${row._id}`);
             }}
           >
-            View
+            <Eye className="mr-xs h-4 w-4" />
           </Button>
           {row.status === 'active' && (
             <Button
@@ -219,7 +220,7 @@ export default function ManagersListPage() {
                 openOffboardDialog(row);
               }}
             >
-              Off-board
+              <UserX className="mr-xs h-4 w-4" />
             </Button>
           )}
           {row.status === 'offboarded' && (
@@ -232,7 +233,6 @@ export default function ManagersListPage() {
               }}
             >
               <RefreshCw className="mr-xs h-3 w-3" />
-              Re-Onboard
             </Button>
           )}
           <Button
@@ -244,7 +244,7 @@ export default function ManagersListPage() {
               openDeleteDialog(row);
             }}
           >
-            Delete
+            <Trash2 className="mr-xs h-4 w-4" />
           </Button>
         </div>
       ),

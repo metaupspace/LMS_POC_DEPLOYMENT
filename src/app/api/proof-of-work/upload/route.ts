@@ -4,6 +4,7 @@ import ProofOfWork from '@/lib/db/models/ProofOfWork';
 import { withAuth } from '@/lib/auth/rbac';
 import { uploadFile } from '@/lib/cloudinary/config';
 import { successResponse, errorResponse } from '@/lib/utils/apiResponse';
+import { updateStreak } from '@/lib/utils/updateStreak';
 import { publishToQueue } from '@/lib/rabbitmq/producer';
 import { QUEUE_NAMES } from '@/lib/rabbitmq/connection';
 
@@ -46,6 +47,9 @@ export const POST = withAuth(
         status: 'submitted',
         submittedAt: new Date(),
       });
+
+      // Update daily streak on proof submission
+      await updateStreak(currentUserId);
 
       // Publish notification to coach
       await publishToQueue(QUEUE_NAMES.NOTIFICATION, {

@@ -10,6 +10,7 @@ import { successResponse, errorResponse } from '@/lib/utils/apiResponse';
 import { publishToQueue } from '@/lib/rabbitmq/producer';
 import { QUEUE_NAMES } from '@/lib/rabbitmq/connection';
 import { POINTS, BADGE_TIERS } from '@/lib/constants';
+import { updateStreak } from '@/lib/utils/updateStreak';
 
 // POST /api/quizzes/[id]/attempt
 export const POST = withAuth(
@@ -160,30 +161,6 @@ export const POST = withAuth(
           }
         }
 
-        // Update streak
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const lastActivity = gamification.streak.lastActivityDate;
-
-        if (lastActivity) {
-          const lastDate = new Date(lastActivity);
-          lastDate.setHours(0, 0, 0, 0);
-          const diffDays = Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-
-          if (diffDays === 1) {
-            gamification.streak.current += 1;
-          } else if (diffDays > 1) {
-            gamification.streak.current = 1;
-          }
-        } else {
-          gamification.streak.current = 1;
-        }
-
-        if (gamification.streak.current > gamification.streak.longest) {
-          gamification.streak.longest = gamification.streak.current;
-        }
-        gamification.streak.lastActivityDate = new Date();
-
         await gamification.save();
       } else {
         if (progress.status === 'not_started') {
@@ -192,6 +169,9 @@ export const POST = withAuth(
       }
 
       await progress.save();
+
+      // Update daily streak on every quiz attempt
+      await updateStreak(currentUserId);
 
       const attemptNumber = progress.quizAttempts.length;
       const attemptsRemaining = quiz.maxAttempts - attemptNumber;

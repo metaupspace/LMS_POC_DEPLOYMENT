@@ -200,58 +200,62 @@ export default function CoachesList() {
         align: 'right' as const,
         render: (_value, row) => (
           <div className="flex items-center justify-end gap-xs">
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={(e) => {
                 e.stopPropagation();
                 router.push(`/admin/coaches/${row._id}`);
               }}
-              className="rounded-sm p-xs text-text-secondary transition-colors hover:bg-surface-background hover:text-primary-main"
               aria-label={`View ${row.name}`}
+              size="sm"
             >
-              <Eye className="h-4 w-4" />
-            </button>
+              <Eye className="mr-xs h-4 w-4" />
+            </Button>
             {isAdmin && row.status === 'active' && (
-              <button
+              <Button
                 type="button"
+                variant='ghost'
+                size='sm'
                 onClick={(e) => {
                   e.stopPropagation();
                   setTargetUser(row);
                   dispatch(openModal('offboard-coach'));
                 }}
-                className="rounded-sm p-xs text-text-secondary transition-colors hover:bg-surface-background hover:text-warning"
                 aria-label={`Off-board ${row.name}`}
               >
-                <UserX className="h-4 w-4" />
-              </button>
+                <UserX className="mr-xs h-4 w-4" />
+              </Button>
             )}
             {isAdmin && row.status === 'offboarded' && (
-              <button
+              <Button
                 type="button"
+                variant='ghost'
+                size='sm'
                 onClick={(e) => {
                   e.stopPropagation();
                   setTargetUser(row);
                   dispatch(openModal('onboard-coach'));
                 }}
-                className="rounded-sm p-xs text-text-secondary transition-colors hover:bg-surface-background hover:text-success"
                 aria-label={`Re-onboard ${row.name}`}
               >
-                <RefreshCw className="h-4 w-4" />
-              </button>
+                <RefreshCw className="mr-xs h-4 w-4" />
+              </Button>
             )}
             {isAdmin && (
-              <button
+              <Button
                 type="button"
+                variant='ghost'
+                size='sm'
                 onClick={(e) => {
                   e.stopPropagation();
                   setTargetUser(row);
                   dispatch(openModal('delete-coach'));
                 }}
-                className="rounded-sm p-xs text-text-secondary transition-colors hover:bg-surface-background hover:text-error"
                 aria-label={`Delete ${row.name}`}
               >
-                <Trash2 className="h-4 w-4" />
-              </button>
+                <Trash2 className="mr-xs h-4 w-4" />
+              </Button>
             )}
           </div>
         ),

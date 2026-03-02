@@ -79,6 +79,7 @@ const badgeTierVariant: Record<BadgeTier, BadgeComponentVariant> = {
 // ─── Format Status Label ──────────────────────────────────
 
 function formatStatusLabel(status: string): string {
+  if (!status) return '-';
   return status
     .split('_')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -131,7 +132,46 @@ export default function StaffDetailPage() {
 
   const staff = userResponse?.data;
   const gamification = gamificationResponse?.data;
-  const progressRecords = progressResponse?.data ?? [];
+
+  // The /progress/[userId] API returns grouped data: { course, modules }[]
+  // Flatten it into a table-friendly format
+  interface GroupedProgress {
+    course: { _id: string; title: string };
+    modules: Array<{
+      module: { _id: string; title: string; order: number };
+      status: string;
+      videoCompleted: boolean;
+      videoPoints: number;
+      quizPassed: boolean;
+      quizPoints: number;
+      proofOfWorkPoints: number;
+      totalModulePoints: number;
+      completedContents: number[];
+      completedAt: string;
+    }>;
+  }
+
+  const rawProgress = (progressResponse?.data ?? []) as unknown as GroupedProgress[];
+  const progressRecords: ProgressData[] = rawProgress.flatMap((group) =>
+    group.modules.map((m) => ({
+      _id: m.module?._id ?? '',
+      user: id,
+      course: group.course?.title ?? '',
+      module: m.module?.title ?? '',
+      status: m.status as ProgressData['status'],
+      completedContents: m.completedContents ?? [],
+      videoCompleted: m.videoCompleted,
+      videoPoints: m.videoPoints,
+      quizAttempts: [],
+      quizPassed: m.quizPassed,
+      quizPoints: m.quizPoints,
+      proofOfWorkPoints: m.proofOfWorkPoints,
+      totalModulePoints: m.totalModulePoints,
+      completedAt: m.completedAt ?? '',
+      createdAt: '',
+      updatedAt: '',
+    }))
+  );
 
   // Form setup
   const {

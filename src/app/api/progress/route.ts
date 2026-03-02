@@ -8,6 +8,7 @@ import { withAuth } from '@/lib/auth/rbac';
 import { successResponse, errorResponse, paginatedResponse } from '@/lib/utils/apiResponse';
 import { getPaginationParams, buildPaginationMeta } from '@/lib/utils/pagination';
 import { POINTS, BADGE_TIERS } from '@/lib/constants';
+import { updateStreak } from '@/lib/utils/updateStreak';
 import type { FilterQuery } from 'mongoose';
 import type { ILearnerProgress } from '@/types';
 import { z } from 'zod';
@@ -239,25 +240,6 @@ export const PATCH = withAuth(
             }
           }
 
-          // Update streak
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const lastActivity = gamification.streak.lastActivityDate;
-          if (lastActivity) {
-            const lastDate = new Date(lastActivity);
-            lastDate.setHours(0, 0, 0, 0);
-            const diffDays = Math.floor(
-              (today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24)
-            );
-            if (diffDays === 1) gamification.streak.current += 1;
-            else if (diffDays > 1) gamification.streak.current = 1;
-          } else {
-            gamification.streak.current = 1;
-          }
-          if (gamification.streak.current > gamification.streak.longest) {
-            gamification.streak.longest = gamification.streak.current;
-          }
-          gamification.streak.lastActivityDate = new Date();
           await gamification.save();
         } else if (progress.status === 'not_started' && progress.completedContents.length > 0) {
           progress.status = 'in_progress';
@@ -269,6 +251,9 @@ export const PATCH = withAuth(
         (progress.videoPoints || 0) + (progress.quizPoints || 0) + (progress.proofOfWorkPoints || 0);
 
       await progress.save();
+
+      // Update daily streak on every content activity
+      await updateStreak(currentUserId);
 
       return successResponse(progress.toJSON(), 'Progress updated');
     } catch (err) {

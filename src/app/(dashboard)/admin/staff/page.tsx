@@ -216,58 +216,62 @@ export default function StaffListPage() {
       align: 'right',
       render: (_value: unknown, row: UserData) => (
         <div className="flex items-center justify-end gap-xs">
-          <button
+          <Button
             type="button"
+            variant='ghost'
+            size='sm'
             onClick={(e) => {
               e.stopPropagation();
               router.push(`/admin/staff/${row._id}`);
             }}
-            className="rounded-sm p-xs text-text-secondary transition-colors hover:bg-surface-background hover:text-primary-main"
             aria-label={`View ${row.name}`}
           >
             <Eye className="h-4 w-4" />
-          </button>
+          </Button>
           {isAdmin && row.status === 'active' && (
-            <button
+            <Button
               type="button"
+              variant='ghost'
+              size='sm'
               onClick={(e) => {
                 e.stopPropagation();
                 setSelectedUser(row);
                 dispatch(openModal('offboard-staff'));
               }}
-              className="rounded-sm p-xs text-text-secondary transition-colors hover:bg-surface-background hover:text-warning"
               aria-label={`Off-board ${row.name}`}
             >
               <UserMinus className="h-4 w-4" />
-            </button>
+            </Button>
           )}
           {isAdmin && row.status === 'offboarded' && (
-            <button
+            <Button
               type="button"
+              variant='ghost'
+              size='sm'
               onClick={(e) => {
                 e.stopPropagation();
                 setSelectedUser(row);
                 dispatch(openModal('onboard-staff'));
               }}
-              className="rounded-sm p-xs text-text-secondary transition-colors hover:bg-surface-background hover:text-success"
               aria-label={`Re-onboard ${row.name}`}
             >
               <RefreshCw className="h-4 w-4" />
-            </button>
+            </Button>
           )}
           {isAdmin && (
-            <button
+            <Button
+              variant='ghost'
+              size='sm'
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 setSelectedUser(row);
                 dispatch(openModal('delete-staff'));
               }}
-              className="rounded-sm p-xs text-text-secondary transition-colors hover:bg-surface-background hover:text-error"
               aria-label={`Delete ${row.name}`}
             >
               <Trash2 className="h-4 w-4" />
-            </button>
+            </Button>
           )}
         </div>
       ),
@@ -322,7 +326,6 @@ export default function StaffListPage() {
       </div>
 
       {/* Filters */}
-      <Card>
         <div className="flex flex-col gap-md sm:flex-row sm:items-end">
           <SearchBar
             value={search}
@@ -361,7 +364,6 @@ export default function StaffListPage() {
             className="w-full sm:w-[160px]"
           />
         </div>
-      </Card>
 
       {/* Table */}
       <Table<UserData>

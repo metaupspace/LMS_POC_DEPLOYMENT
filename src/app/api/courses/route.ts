@@ -32,6 +32,12 @@ export const GET = withAuth(
         filter.assignedStaff = currentUserId;
       }
 
+      // Admin/Manager: filter by coach ID if provided
+      const coachParam = searchParams.get('coach');
+      if (coachParam && (currentRole === 'admin' || currentRole === 'manager')) {
+        filter.coach = coachParam;
+      }
+
       // Domain filter
       const domain = searchParams.get('domain');
       if (domain) filter.domain = domain;

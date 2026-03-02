@@ -81,6 +81,27 @@ export const GET = withAuth(
         }
       }
 
+      // Check if streak has lapsed (last activity older than yesterday)
+      const streakData = gamification.streak;
+      let currentStreak = streakData?.current ?? 0;
+      if (streakData?.lastActivityDate && currentStreak > 0) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+        const lastStr = new Date(streakData.lastActivityDate).toISOString().split('T')[0];
+
+        if (lastStr !== todayStr && lastStr !== yesterdayStr) {
+          // Streak broken — reset current to 0
+          currentStreak = 0;
+          await Gamification.findOneAndUpdate(
+            { user: userId },
+            { 'streak.current': 0 },
+          );
+          gamification = { ...gamification, streak: { ...streakData, current: 0 } };
+        }
+      }
+
       // Calculate next badge
       const earnedBadgeNames = new Set(gamification.badges.map((b) => b.name));
       const nextBadge = BADGE_TIERS.find((tier) => !earnedBadgeNames.has(tier.name));
