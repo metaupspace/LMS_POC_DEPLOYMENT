@@ -6,8 +6,10 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET(req: NextRequest) {
-  // Authenticate from query param
-  const token = req.nextUrl.searchParams.get('token');
+  // Try cookie first, then query param (EventSource can't send headers)
+  const token =
+    req.cookies.get('token')?.value ||
+    req.nextUrl.searchParams.get('token');
 
   if (!token) {
     return new Response('Unauthorized', { status: 401 });
@@ -16,10 +18,14 @@ export async function GET(req: NextRequest) {
   let userId: string;
   try {
     const decoded = verifyAccessToken(token);
-    userId = decoded.userId;
-  } catch {
+    userId = (decoded.userId || (decoded as Record<string, unknown>).id || (decoded as Record<string, unknown>)._id)?.toString();
+    if (!userId) throw new Error('No user ID in token');
+  } catch (err) {
+    console.error('[SSE] Token verification failed:', err instanceof Error ? err.message : err);
     return new Response('Invalid token', { status: 401 });
   }
+
+  console.log('[SSE] Client connecting:', userId);
 
   const stream = new ReadableStream({
     start(controller) {
@@ -41,6 +47,7 @@ export async function GET(req: NextRequest) {
 
       // Cleanup on disconnect
       req.signal.addEventListener('abort', () => {
+        console.log('[SSE] Client disconnected:', userId);
         clearInterval(heartbeat);
         sseManager.removeClient(userId, controller);
       });

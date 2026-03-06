@@ -9,6 +9,7 @@ import { loginSchema, type LoginInput } from '@/lib/validators/auth';
 import { useLoginMutation } from '@/store/slices/api/authApi';
 import { useAppDispatch } from '@/store/hooks';
 import { setCredentials } from '@/store/slices/authSlice';
+import { baseApi } from '@/store/slices/api/baseApi';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import { useTranslation } from '@/i18n';
@@ -57,6 +58,9 @@ export default function LoginPage() {
             refreshToken,
           })
         );
+
+        // Force RTK Query to discard any cached notification data and refetch
+        dispatch(baseApi.util.invalidateTags(['Notification']));
 
         // Redirect first-login users to onboarding
         if (user.firstLogin) {

@@ -27,17 +27,26 @@ class SSEManager {
 
   sendToUser(userId: string, data: unknown): void {
     const userClients = this.clients.get(userId);
-    if (!userClients || userClients.length === 0) return;
+    if (!userClients || userClients.length === 0) {
+      console.log(`[SSE] No active clients for user ${userId}`);
+      return;
+    }
 
     const message = `data: ${JSON.stringify(data)}\n\n`;
     const encoder = new TextEncoder();
+    let sent = 0;
 
     for (const client of userClients) {
       try {
         client.controller.enqueue(encoder.encode(message));
+        sent++;
       } catch {
         this.removeClient(userId, client.controller);
       }
+    }
+
+    if (sent > 0) {
+      console.log(`[SSE] Sent to ${sent} client(s) for user ${userId}`);
     }
   }
 
@@ -45,6 +54,14 @@ class SSEManager {
     for (const userId of userIds) {
       this.sendToUser(userId, data);
     }
+  }
+
+  getClientCount(): number {
+    let count = 0;
+    for (const clients of this.clients.values()) {
+      count += clients.length;
+    }
+    return count;
   }
 }
 

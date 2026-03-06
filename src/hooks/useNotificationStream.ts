@@ -15,11 +15,18 @@ export function useNotificationStream(onNotification: NotificationHandler) {
 
     let eventSource: EventSource | null = null;
     let retryTimeout: ReturnType<typeof setTimeout>;
+    let isCancelled = false;
 
     const connect = () => {
+      if (isCancelled) return;
+
       eventSource = new EventSource(
         `/api/notifications/stream?token=${encodeURIComponent(accessToken)}`
       );
+
+      eventSource.onopen = () => {
+        console.log('[SSE] Connected to notification stream');
+      };
 
       eventSource.onmessage = (event) => {
         try {
@@ -32,14 +39,16 @@ export function useNotificationStream(onNotification: NotificationHandler) {
 
       eventSource.onerror = () => {
         eventSource?.close();
-        // Retry after 5 seconds
-        retryTimeout = setTimeout(connect, 5000);
+        if (!isCancelled) {
+          retryTimeout = setTimeout(connect, 5000);
+        }
       };
     };
 
     connect();
 
     return () => {
+      isCancelled = true;
       eventSource?.close();
       clearTimeout(retryTimeout);
     };

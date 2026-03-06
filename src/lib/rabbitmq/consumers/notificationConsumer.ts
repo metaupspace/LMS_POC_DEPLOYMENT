@@ -12,6 +12,9 @@ const typeMap: Record<string, string> = {
   session_assigned: 'session_reminder',
   badge_earned: 'badge_earned',
   proof_update: 'proof_update',
+  proof_submitted: 'proof_submitted',
+  proof_approved: 'proof_approved',
+  proof_rejected: 'proof_rejected',
   streak: 'streak',
   welcome: 'general',
   general: 'general',
@@ -89,6 +92,33 @@ function buildNotification(
         type,
         metadata: payload,
       };
+    case 'proof_submitted':
+      return {
+        title: 'New Proof of Work Submission',
+        message: payload.learnerName
+          ? `${payload.learnerName} submitted proof of work for "${payload.courseTitle ?? 'a course'}". Review it now.`
+          : 'A learner submitted proof of work for review.',
+        type,
+        metadata: payload,
+      };
+    case 'proof_approved':
+      return {
+        title: 'Proof of Work Approved!',
+        message: payload.courseTitle
+          ? `Your proof of work for "${payload.courseTitle}" has been approved! +${payload.points ?? 30} points earned.`
+          : 'Your proof of work has been approved!',
+        type,
+        metadata: payload,
+      };
+    case 'proof_rejected':
+      return {
+        title: 'Proof of Work — Redo Required',
+        message: payload.courseTitle
+          ? `Your proof of work for "${payload.courseTitle}" needs revision.${payload.reviewNote ? ` Feedback: "${payload.reviewNote}"` : ''}`
+          : 'Your proof of work needs revision.',
+        type,
+        metadata: payload,
+      };
     default:
       return {
         title: payload.title ?? 'Notification',
@@ -140,6 +170,7 @@ async function processNotificationMessage(queueMsg: QueueMessage): Promise<void>
     createdAt: new Date().toISOString(),
   };
 
+  console.log(`[NotificationConsumer] Pushing to ${userIds.length} SSE client(s):`, msgType);
   sseManager.sendToUsers(userIds, ssePayload);
 }
 

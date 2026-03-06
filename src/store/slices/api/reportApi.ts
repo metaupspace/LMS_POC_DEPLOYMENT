@@ -3,14 +3,14 @@ import { baseApi } from './baseApi';
 // ─── Types ──────────────────────────────────────────────
 
 export interface LearnerProgressReportParams {
-  course?: string;
-  user?: string;
+  courseId?: string;
+  userId?: string;
   status?: string;
   format?: 'json' | 'excel' | 'pdf';
 }
 
 export interface SessionAttendanceReportParams {
-  session?: string;
+  sessionId?: string;
   instructor?: string;
   domain?: string;
   dateFrom?: string;

@@ -1,6 +1,7 @@
 import { type NextRequest } from 'next/server';
 import { connectDB } from '@/lib/db/connect';
 import ProofOfWork from '@/lib/db/models/ProofOfWork';
+import Course from '@/lib/db/models/Course';
 import LearnerProgress from '@/lib/db/models/LearnerProgress';
 import Gamification from '@/lib/db/models/Gamification';
 import { withAuth } from '@/lib/auth/rbac';
@@ -89,17 +90,34 @@ export const POST = withAuth(
         await gamification.save();
       }
 
-      // Publish notification to staff
-      await publishToQueue(QUEUE_NAMES.NOTIFICATION, {
-        type: 'proof_update',
-        payload: {
-          proofId: id,
-          userId: record.user.toString(),
-          status: parsed.data.status,
-          reviewNote: parsed.data.reviewNote,
-        },
-        timestamp: new Date().toISOString(),
-      }).catch(() => {});
+      // Notify the learner about the review result
+      const course = await Course.findById(record.course).select('title').lean();
+      const courseTitle = course?.title ?? '';
+      const learnerId = record.user.toString();
+
+      if (parsed.data.status === 'approved') {
+        await publishToQueue(QUEUE_NAMES.NOTIFICATION, {
+          type: 'proof_approved',
+          payload: {
+            userIds: [learnerId],
+            courseId: record.course.toString(),
+            courseTitle,
+            points: POINTS.PROOF_OF_WORK_APPROVED,
+          },
+          timestamp: new Date().toISOString(),
+        }).catch(() => {});
+      } else {
+        await publishToQueue(QUEUE_NAMES.NOTIFICATION, {
+          type: 'proof_rejected',
+          payload: {
+            userIds: [learnerId],
+            courseId: record.course.toString(),
+            courseTitle,
+            reviewNote: parsed.data.reviewNote,
+          },
+          timestamp: new Date().toISOString(),
+        }).catch(() => {});
+      }
 
       const updated = await ProofOfWork.findById(id)
         .populate('user', 'name empId')

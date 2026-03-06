@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
+import ImageModal from '@/components/ui/ImageModal';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -17,7 +18,6 @@ import {
   CheckCircle2,
   Circle,
   Timer,
-  ExternalLink,
   Star,
 } from 'lucide-react';
 import { Card, Badge, Button } from '@/components/ui';
@@ -317,6 +317,7 @@ function ProofCard({ proof, userMap }: ProofCardProps) {
   const [reviewProof, { isLoading: isReviewing }] = useReviewProofMutation();
   const [activeAction, setActiveAction] = useState<'approve' | 'redo' | null>(null);
   const [reviewNote, setReviewNote] = useState('');
+  const [showImage, setShowImage] = useState(false);
 
   // proof.user can be a populated object or a plain string ID
   const userInfo = extractUserInfo(proof.user);
@@ -375,16 +376,34 @@ function ProofCard({ proof, userMap }: ProofCardProps) {
         </Badge>
       </div>
 
-      {/* File link */}
-      <a
-        href={proof.fileUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-xs text-body-md font-medium text-primary-main min-h-[44px]"
-      >
-        <ExternalLink className="h-4 w-4" strokeWidth={1.5} />
-        Open File
-      </a>
+      {/* File preview — click opens modal */}
+      {proof.fileUrl && (
+        <button
+          type="button"
+          onClick={() => setShowImage(true)}
+          className="inline-flex items-center gap-sm text-body-md font-medium text-primary-main min-h-[44px] hover:opacity-80 transition-opacity"
+        >
+          {proof.fileUrl.match(/\.(jpg|jpeg|png|webp)/i) ? (
+            <img
+              src={proof.fileUrl}
+              alt="Proof"
+              className="w-14 h-14 object-cover rounded-sm border border-border-light"
+            />
+          ) : (
+            <div className="w-14 h-14 bg-surface-background rounded-sm border border-border-light flex items-center justify-center">
+              <span className="text-caption text-text-secondary">PDF</span>
+            </div>
+          )}
+          <span>View Submission</span>
+        </button>
+      )}
+
+      <ImageModal
+        isOpen={showImage}
+        onClose={() => setShowImage(false)}
+        imageUrl={proof.fileUrl}
+        fileName={proof.fileType ? `proof.${proof.fileType}` : undefined}
+      />
 
       {/* Review note if already reviewed */}
       {proof.reviewNote && proof.status !== 'submitted' && (

@@ -62,7 +62,7 @@ export default function ReportsPage() {
   ];
 
   const sessionItems = [
-    { label: 'All Sessions', value: '' },
+    { label: 'Select a session', value: '' },
     ...sessions.map((s) => ({
       label: `${s.title} (${new Date(s.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })})`,
       value: s._id,
@@ -83,8 +83,8 @@ export default function ReportsPage() {
   const handleGenerateLearnerProgress = useCallback(async () => {
     try {
       const result = await triggerLearnerProgressReport({
-        course: lpCourse || undefined,
-        user: lpUser || undefined,
+        courseId: lpCourse || undefined,
+        userId: lpUser || undefined,
         format: lpFormat,
       }).unwrap();
 
@@ -112,9 +112,20 @@ export default function ReportsPage() {
   }, [triggerLearnerProgressReport, lpCourse, lpUser, lpFormat, handleDownloadBlob, dispatch]);
 
   const handleGenerateSessionAttendance = useCallback(async () => {
+    if (!saSession) {
+      dispatch(
+        addToast({
+          type: 'error',
+          message: 'Please select a session first',
+          duration: 3000,
+        })
+      );
+      return;
+    }
+
     try {
       const result = await triggerSessionAttendanceReport({
-        session: saSession || undefined,
+        sessionId: saSession,
         format: saFormat,
       }).unwrap();
 

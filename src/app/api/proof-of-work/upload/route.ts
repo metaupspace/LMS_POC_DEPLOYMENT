@@ -1,6 +1,7 @@
 import { type NextRequest } from 'next/server';
 import { connectDB } from '@/lib/db/connect';
 import ProofOfWork from '@/lib/db/models/ProofOfWork';
+import Course from '@/lib/db/models/Course';
 import { withAuth } from '@/lib/auth/rbac';
 import { uploadFile } from '@/lib/cloudinary/config';
 import { successResponse, errorResponse } from '@/lib/utils/apiResponse';
@@ -51,17 +52,25 @@ export const POST = withAuth(
       // Update daily streak on proof submission
       await updateStreak(currentUserId);
 
-      // Publish notification to coach
-      await publishToQueue(QUEUE_NAMES.NOTIFICATION, {
-        type: 'proof_update',
-        payload: {
-          proofId: record._id.toString(),
-          userId: currentUserId,
-          courseId,
-          action: 'submitted',
-        },
-        timestamp: new Date().toISOString(),
-      }).catch(() => {});
+      // Notify the course's coach about the submission
+      const course = await Course.findById(courseId).select('coach title').lean();
+      if (course?.coach) {
+        const coachId = course.coach.toString();
+        const learnerName = request.headers.get('x-user-name') ?? 'A learner';
+
+        await publishToQueue(QUEUE_NAMES.NOTIFICATION, {
+          type: 'proof_submitted',
+          payload: {
+            userIds: [coachId],
+            courseId,
+            courseTitle: course.title,
+            learnerId: currentUserId,
+            learnerName,
+            proofId: record._id.toString(),
+          },
+          timestamp: new Date().toISOString(),
+        }).catch(() => {});
+      }
 
       return successResponse(record.toJSON(), 'Proof of work submitted', 201);
     } catch (err) {

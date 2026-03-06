@@ -9,6 +9,8 @@ import { withAuth } from '@/lib/auth/rbac';
 import { updateCourseSchema } from '@/lib/validators/course';
 import { successResponse, errorResponse } from '@/lib/utils/apiResponse';
 import { redisDelPattern } from '@/lib/redis/client';
+import { publishToQueue } from '@/lib/rabbitmq/producer';
+import { QUEUE_NAMES } from '@/lib/rabbitmq/connection';
 
 // GET /api/courses/[id]
 export const GET = withAuth(
@@ -77,9 +79,26 @@ export const PATCH = withAuth(
         return errorResponse('Course not found', 404);
       }
 
+      const previousCoachId = course.coach?.toString();
+
       const updated = await Course.findByIdAndUpdate(id, parsed.data, { new: true })
         .populate('coach', 'name empId')
         .lean();
+
+      // Notify new coach if coach was changed
+      const newCoachId = updated?.coach?._id?.toString() ?? updated?.coach?.toString();
+      if (newCoachId && newCoachId !== previousCoachId) {
+        await publishToQueue(QUEUE_NAMES.NOTIFICATION, {
+          type: 'course_assigned',
+          payload: {
+            userIds: [newCoachId],
+            courseId: id,
+            courseTitle: updated?.title ?? course.title,
+            role: 'coach',
+          },
+          timestamp: new Date().toISOString(),
+        }).catch(() => {});
+      }
 
       // Invalidate course list cache
       await redisDelPattern('courses:list:*').catch(() => {});

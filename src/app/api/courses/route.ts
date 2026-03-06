@@ -6,6 +6,8 @@ import { createCourseSchema } from '@/lib/validators/course';
 import { successResponse, errorResponse, paginatedResponse } from '@/lib/utils/apiResponse';
 import { getPaginationParams, buildPaginationMeta } from '@/lib/utils/pagination';
 import { redisGet, redisSet, redisDelPattern } from '@/lib/redis/client';
+import { publishToQueue } from '@/lib/rabbitmq/producer';
+import { QUEUE_NAMES } from '@/lib/rabbitmq/connection';
 import type { FilterQuery } from 'mongoose';
 import type { ICourse } from '@/types';
 
@@ -143,6 +145,21 @@ export const POST = withAuth(
         ...parsed.data,
         createdBy: currentUserId,
       });
+
+      // Notify coach if one was assigned
+      if (course.coach) {
+        const coachId = course.coach.toString();
+        await publishToQueue(QUEUE_NAMES.NOTIFICATION, {
+          type: 'course_assigned',
+          payload: {
+            userIds: [coachId],
+            courseId: course._id.toString(),
+            courseTitle: course.title,
+            role: 'coach',
+          },
+          timestamp: new Date().toISOString(),
+        }).catch(() => {});
+      }
 
       // Invalidate course list cache
       await redisDelPattern('courses:list:*').catch(() => {});

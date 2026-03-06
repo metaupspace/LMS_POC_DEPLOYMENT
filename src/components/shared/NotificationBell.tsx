@@ -36,12 +36,20 @@ export default function NotificationBell({ iconClassName = 'text-white' }: Notif
   const ref = useRef<HTMLDivElement>(null);
   const permissionRef = useRef(false);
 
+  const user = useAppSelector((s) => s.auth.user);
+  const userId = user?.id;
+
   const { data, refetch } = useGetNotificationsQuery(
     { limit: 5, read: false },
-    { pollingInterval: 30000 }
+    {
+      skip: !userId,
+      pollingInterval: 30000,
+      refetchOnMountOrArgChange: true,
+      refetchOnFocus: true,
+    }
   );
   const [markAsRead] = useMarkAsReadMutation();
-  const userRole = useAppSelector((s) => s.auth.user?.role);
+  const userRole = user?.role;
   const viewAllHref = viewAllRoutes[userRole ?? 'admin'] ?? '/admin/notifications';
 
   const notifications = data?.data ?? [];
