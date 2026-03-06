@@ -11,7 +11,10 @@
       "Bash(cat:*)",
       "Bash(head:*)",
       "Bash(npm install:*)",
-      "Bash(npx storybook@latest:*)"
+      "Bash(npx storybook@latest:*)",
+      "Bash(node:*)",
+      "Bash(npm ls:*)",
+      "Bash(sips:*)"
     ]
   }
 }

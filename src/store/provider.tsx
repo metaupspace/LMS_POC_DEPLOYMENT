@@ -15,12 +15,10 @@ export default function ReduxProvider({ children }: { children: React.ReactNode 
       hydrated.current = true;
     }
 
-    // Register service worker in production
+    // Register service worker
     if (
       typeof window !== 'undefined' &&
-      'serviceWorker' in navigator &&
-      window.location.hostname !== 'localhost' &&
-      window.location.hostname !== '127.0.0.1'
+      'serviceWorker' in navigator
     ) {
       navigator.serviceWorker
         .register('/sw.js')

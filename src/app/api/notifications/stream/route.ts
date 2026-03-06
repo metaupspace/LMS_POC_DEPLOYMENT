@@ -18,7 +18,8 @@ export async function GET(req: NextRequest) {
   let userId: string;
   try {
     const decoded = verifyAccessToken(token);
-    userId = (decoded.userId || (decoded as Record<string, unknown>).id || (decoded as Record<string, unknown>)._id)?.toString();
+    const rawId = decoded.userId || (decoded as Record<string, unknown>).id || (decoded as Record<string, unknown>)._id;
+    userId = rawId ? String(rawId) : '';
     if (!userId) throw new Error('No user ID in token');
   } catch (err) {
     console.error('[SSE] Token verification failed:', err instanceof Error ? err.message : err);

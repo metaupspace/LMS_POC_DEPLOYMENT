@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ProtectedRoute } from '@/components/shared';
 import NotificationBell from '@/components/shared/NotificationBell';
+import PWAInstallPrompt from '@/components/shared/PWAInstallPrompt';
 import { BottomNav } from '@/components/coach';
 import { ToastContainer } from '@/components/ui';
 
@@ -24,6 +25,7 @@ export default function CoachLayout({ children }: { children: React.ReactNode })
         </main>
 
         <BottomNav />
+        <PWAInstallPrompt />
         <ToastContainer />
       </div>
     </ProtectedRoute>

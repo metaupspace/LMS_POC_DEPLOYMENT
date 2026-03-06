@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ProtectedRoute } from '@/components/shared';
 import NotificationBell from '@/components/shared/NotificationBell';
+import PWAInstallPrompt from '@/components/shared/PWAInstallPrompt';
 import { BottomNavLearner } from '@/components/learner';
 import { ToastContainer } from '@/components/ui';
 
@@ -24,6 +25,7 @@ export default function LearnerLayout({ children }: { children: React.ReactNode 
         </main>
 
         <BottomNavLearner />
+        <PWAInstallPrompt />
         <ToastContainer />
       </div>
     </ProtectedRoute>
