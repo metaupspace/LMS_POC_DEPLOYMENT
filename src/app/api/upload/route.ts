@@ -15,10 +15,23 @@ export const POST = withAuth(
       const file = formData.get('file') as File | null;
       const folder = (formData.get('folder') as string) ?? 'general';
       const type = (formData.get('type') as string) ?? 'general';
-      const resourceType = (formData.get('resource_type') as string) ?? undefined;
+      const explicitResourceType = formData.get('resource_type') as string | null;
 
       if (!file) {
         return errorResponse('File is required', 400);
+      }
+
+      // Auto-detect resource_type from MIME when not explicitly provided
+      // PDFs MUST be 'raw' — Cloudinary corrupts them as 'image' or 'auto'
+      let resourceType: 'image' | 'video' | 'raw' | 'auto';
+      if (explicitResourceType) {
+        resourceType = explicitResourceType as 'image' | 'video' | 'raw' | 'auto';
+      } else if (file.type.startsWith('image/')) {
+        resourceType = 'image';
+      } else if (file.type.startsWith('video/')) {
+        resourceType = 'video';
+      } else {
+        resourceType = 'raw';
       }
 
       // Determine max size based on type or resource_type
@@ -35,9 +48,7 @@ export const POST = withAuth(
       }
 
       const buffer = Buffer.from(await file.arrayBuffer());
-      const result = await uploadFile(buffer, folder, {
-        resourceType: (resourceType as 'image' | 'video' | 'raw' | 'auto') ?? undefined,
-      });
+      const result = await uploadFile(buffer, folder, { resourceType });
 
       return successResponse(
         {

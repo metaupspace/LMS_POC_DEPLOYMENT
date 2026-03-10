@@ -383,7 +383,12 @@ function ProofCard({ proof, userMap }: ProofCardProps) {
           onClick={() => setShowImage(true)}
           className="inline-flex items-center gap-sm text-body-md font-medium text-primary-main min-h-[44px] hover:opacity-80 transition-opacity"
         >
-          {proof.fileUrl.match(/\.(jpg|jpeg|png|webp)/i) ? (
+          {proof.fileType?.includes('pdf') || proof.fileUrl.toLowerCase().includes('.pdf') ? (
+            <div className="w-14 h-14 bg-red-50 rounded-sm border border-red-200 flex flex-col items-center justify-center">
+              <span className="text-red-500 text-lg font-bold">PDF</span>
+              <span className="text-red-400 text-[10px]">Click to view</span>
+            </div>
+          ) : proof.fileUrl.match(/\.(jpg|jpeg|png|webp|gif)/i) ? (
             <Image
               src={proof.fileUrl}
               alt="Proof"
@@ -394,7 +399,7 @@ function ProofCard({ proof, userMap }: ProofCardProps) {
             />
           ) : (
             <div className="w-14 h-14 bg-surface-background rounded-sm border border-border-light flex items-center justify-center">
-              <span className="text-caption text-text-secondary">PDF</span>
+              <span className="text-caption text-text-secondary">File</span>
             </div>
           )}
           <span>View Submission</span>
@@ -406,6 +411,7 @@ function ProofCard({ proof, userMap }: ProofCardProps) {
         onClose={() => setShowImage(false)}
         imageUrl={proof.fileUrl}
         fileName={proof.fileType ? `proof.${proof.fileType}` : undefined}
+        fileType={proof.fileType}
       />
 
       {/* Review note if already reviewed */}
