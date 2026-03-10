@@ -3,15 +3,17 @@
 import { useEffect } from 'react';
 import Image from 'next/image';
 import { X, Download, ExternalLink } from 'lucide-react';
+import PDFViewer from './PDFViewer';
 
 interface ImageModalProps {
   isOpen: boolean;
   onClose: () => void;
   imageUrl: string;
   fileName?: string;
+  fileType?: string;
 }
 
-export default function ImageModal({ isOpen, onClose, imageUrl, fileName }: ImageModalProps) {
+export default function ImageModal({ isOpen, onClose, imageUrl, fileName, fileType }: ImageModalProps) {
   // Close on Escape key
   useEffect(() => {
     if (!isOpen) return;
@@ -34,11 +36,14 @@ export default function ImageModal({ isOpen, onClose, imageUrl, fileName }: Imag
     };
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !imageUrl) return null;
 
+  // Detect if the file is a PDF — check multiple signals
   const isPDF =
+    fileType?.includes('pdf') ||
+    fileName?.toLowerCase().endsWith('.pdf') ||
     imageUrl?.toLowerCase().includes('.pdf') ||
-    fileName?.toLowerCase().endsWith('.pdf');
+    imageUrl?.toLowerCase().includes('/raw/upload/');
 
   return (
     <div
@@ -86,11 +91,7 @@ export default function ImageModal({ isOpen, onClose, imageUrl, fileName }: Imag
 
         {/* Content */}
         {isPDF ? (
-          <iframe
-            src={imageUrl}
-            className="w-full h-[80vh] rounded-md bg-white"
-            title="Proof of Work PDF"
-          />
+          <PDFViewer url={imageUrl} />
         ) : (
           <div className="flex items-center justify-center bg-black/20 rounded-md overflow-hidden">
             <Image

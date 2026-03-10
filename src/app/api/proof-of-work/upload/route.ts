@@ -33,9 +33,18 @@ export const POST = withAuth(
 
       const currentUserId = request.headers.get('x-user-id') ?? '';
 
+      // Determine correct Cloudinary resource_type based on MIME
+      // PDFs MUST be 'raw' — Cloudinary corrupts them when uploaded as 'image' or 'auto'
+      let resourceType: 'image' | 'video' | 'raw' = 'raw';
+      if (file.type.startsWith('image/')) {
+        resourceType = 'image';
+      } else if (file.type.startsWith('video/')) {
+        resourceType = 'video';
+      }
+
       // Upload to Cloudinary
       const buffer = Buffer.from(await file.arrayBuffer());
-      const uploadResult = await uploadFile(buffer, 'proof-of-work');
+      const uploadResult = await uploadFile(buffer, 'proof-of-work', { resourceType });
 
       await connectDB();
 
