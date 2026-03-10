@@ -9,7 +9,6 @@ const withPWA = nextPWA({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
   experimental: {
     instrumentationHook: true,
   },
