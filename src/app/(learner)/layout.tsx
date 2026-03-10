@@ -8,8 +8,7 @@ import PWAInstallPrompt from '@/components/shared/PWAInstallPrompt';
 import { BottomNavLearner } from '@/components/learner';
 import SideNav from '@/components/shared/SideNav';
 import { ToastContainer } from '@/components/ui';
-import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { useRouter } from 'next/navigation';
+import { useAppSelector } from '@/store/hooks';
 
 const learnerNavItems = [
   { label: 'Home', href: '/learner/home', icon: 'Home' },
@@ -19,7 +18,6 @@ const learnerNavItems = [
 ];
 
 export default function LearnerLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
   const pathname = usePathname();
   const user = useAppSelector((s) => s.auth.user);
 
