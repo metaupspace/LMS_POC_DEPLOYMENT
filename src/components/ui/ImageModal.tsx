@@ -52,7 +52,7 @@ export default function ImageModal({ isOpen, onClose, imageUrl, fileName, fileTy
     >
       {/* Modal content */}
       <div
-        className="relative max-w-4xl max-h-[90vh] w-full mx-md"
+        className="relative max-w-lg sm:max-w-2xl lg:max-w-4xl max-h-[90vh] w-full mx-sm sm:mx-md"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top bar */}

@@ -595,7 +595,7 @@ export default function CoachHome() {
             <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
             Live Now
           </h2>
-          <div className="mt-md space-y-md">
+          <div className="mt-md grid grid-cols-1 sm:grid-cols-2 gap-md">
             {todaySessions
               .filter((s) => getDisplayStatus(s) === 'ongoing')
               .map((session) => (
@@ -610,7 +610,7 @@ export default function CoachHome() {
         <h2 className="text-h2 text-text-primary">Today&apos;s Sessions</h2>
 
         {todaySessions.filter((s) => getDisplayStatus(s) === 'upcoming').length > 0 ? (
-          <div className="mt-md space-y-md">
+          <div className="mt-md grid grid-cols-1 sm:grid-cols-2 gap-md">
             {todaySessions
               .filter((s) => getDisplayStatus(s) === 'upcoming')
               .map((session) => (
@@ -645,7 +645,7 @@ export default function CoachHome() {
         </div>
 
         {upcomingPreview.length > 0 ? (
-          <div className="mt-md space-y-sm">
+          <div className="mt-md grid grid-cols-1 sm:grid-cols-2 gap-sm">
             {upcomingPreview.map((session) => (
               <CompactSessionCard key={session._id} session={session} />
             ))}
@@ -675,7 +675,7 @@ export default function CoachHome() {
             )}
           </div>
 
-          <div className="mt-md space-y-sm">
+          <div className="mt-md grid grid-cols-1 sm:grid-cols-2 gap-sm">
             {completedPreview.map((session) => (
               <CompletedSessionCard key={session._id} session={session} />
             ))}

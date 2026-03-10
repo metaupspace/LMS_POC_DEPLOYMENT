@@ -897,7 +897,7 @@ export default function MyLearning() {
 
       {/* Ongoing Tab */}
       {activeTab === 'ongoing' && (
-        <section className="space-y-md">
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-md">
           {isLoading ? (
             <>
               <CourseCardSkeleton />
@@ -925,7 +925,7 @@ export default function MyLearning() {
 
       {/* Assigned Tab */}
       {activeTab === 'assigned' && (
-        <section className="space-y-md">
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-md">
           {isLoading ? (
             <>
               <CourseCardSkeleton />
@@ -953,7 +953,7 @@ export default function MyLearning() {
 
       {/* Completed Tab */}
       {activeTab === 'completed' && (
-        <section className="space-y-md">
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-md">
           {isLoading ? (
             <>
               <CourseCardSkeleton />
@@ -1001,7 +1001,7 @@ export default function MyLearning() {
                   <h2 className="text-h3 font-semibold text-text-primary mb-md">
                     Upcoming Sessions
                   </h2>
-                  <div className="space-y-md">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-md">
                     {upcomingSessions.map((session) => (
                       <SessionUpcomingCard
                         key={session._id}
@@ -1020,7 +1020,7 @@ export default function MyLearning() {
                   <h2 className="text-h3 font-semibold text-text-primary mb-md">
                     Past Sessions
                   </h2>
-                  <div className="space-y-md">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-md">
                     {pastSessions.map((session) => (
                       <SessionPastCard
                         key={session._id}
@@ -1049,7 +1049,7 @@ export default function MyLearning() {
               <h3 className="text-body-md font-medium text-text-secondary mb-sm">
                 Earned ({certifiedTests.length})
               </h3>
-              <div className="space-y-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-sm">
                 {certifiedTests.map((test) => {
                   const cert = certMap.get(test._id);
                   return (

@@ -728,7 +728,7 @@ export default function CoachCourseDetail() {
             {analyticsLoading ? (
               <SkeletonList />
             ) : perLearnerStats.length > 0 ? (
-              <div className="space-y-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-sm">
                 {perLearnerStats.map((stat) => (
                   <StaffProgressRow
                     key={stat.user._id}
@@ -781,7 +781,7 @@ export default function CoachCourseDetail() {
                 {proofsLoading ? (
                   <SkeletonList />
                 ) : filteredProofs.length > 0 ? (
-                  <div className="space-y-md">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-md">
                     {filteredProofs.map((proof) => (
                       <ProofCard key={proof._id} proof={proof} userMap={userMap} />
                     ))}

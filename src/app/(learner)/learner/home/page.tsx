@@ -800,7 +800,7 @@ export default function LearnerHome() {
           <h2 className="text-h3 font-semibold text-text-primary">
             Loading sessions...
           </h2>
-          <div className="mt-md space-y-md">
+          <div className="mt-md grid grid-cols-1 sm:grid-cols-2 gap-md">
             <SessionSkeletonCard />
           </div>
         </section>
@@ -809,7 +809,7 @@ export default function LearnerHome() {
           <h2 className="text-h3 font-semibold text-text-primary">
             You have a session to attend today!
           </h2>
-          <div className="mt-md space-y-md">
+          <div className="mt-md grid grid-cols-1 sm:grid-cols-2 gap-md">
             {todaySessions.map((session) => (
               <SessionAttendanceCard
                 key={session._id}
@@ -827,7 +827,7 @@ export default function LearnerHome() {
           <h2 className="text-h3 font-semibold text-text-primary flex items-center gap-sm">
             <ClipboardCheck className="h-5 w-5" /> Certification Tests
           </h2>
-          <div className="mt-md space-y-sm">
+          <div className="mt-md grid grid-cols-1 sm:grid-cols-2 gap-sm">
             {assignedTests.map((test) => {
               const hasCert = !!test.myCertification;
               const attempts = test.myAttempts?.length ?? 0;
@@ -874,12 +874,12 @@ export default function LearnerHome() {
         </h2>
 
         {isLoading ? (
-          <div className="mt-md space-y-md">
+          <div className="mt-md grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-md">
             <CourseSkeletonCard />
             <CourseSkeletonCard />
           </div>
         ) : learningCourses.length > 0 ? (
-          <div className="mt-md space-y-md">
+          <div className="mt-md grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-md">
             {learningCourses.map((c) => (
               <CourseLearningCard
                 key={c._id}

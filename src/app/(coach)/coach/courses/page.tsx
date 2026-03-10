@@ -139,7 +139,7 @@ export default function CoachCourses() {
 
       {/* Course Cards */}
       {filteredCourses.length > 0 ? (
-        <div className="space-y-md">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-md">
           {filteredCourses.map((course) => (
             <CourseCard key={course._id} course={course} />
           ))}
