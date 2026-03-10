@@ -435,7 +435,7 @@ export default function LearnerSessions() {
             <h2 className="text-h3 font-semibold text-text-primary">Ongoing</h2>
           </div>
 
-          <div className="mt-md space-y-md">
+          <div className="mt-md grid grid-cols-1 sm:grid-cols-2 gap-md">
             {ongoingSessions.map((session) => (
               <ActiveSessionCard
                 key={session._id}
@@ -453,7 +453,7 @@ export default function LearnerSessions() {
         <h2 className="text-h3 font-semibold text-text-primary">Upcoming Sessions</h2>
 
         {upcomingSessions.length > 0 ? (
-          <div className="mt-md space-y-md">
+          <div className="mt-md grid grid-cols-1 sm:grid-cols-2 gap-md">
             {upcomingSessions.map((session) => (
               <ActiveSessionCard
                 key={session._id}
@@ -518,7 +518,7 @@ export default function LearnerSessions() {
         )}
 
         {filteredCompletedSessions.length > 0 ? (
-          <div className="mt-md space-y-md">
+          <div className="mt-md grid grid-cols-1 sm:grid-cols-2 gap-md">
             {filteredCompletedSessions.map((session) => (
               <CompletedSessionCard
                 key={session._id}

@@ -443,7 +443,7 @@ function CertificationsSection() {
           <h2 className="text-h3 font-semibold mb-md flex items-center gap-sm">
             <Award className="h-5 w-5 text-primary-main" /> My Certifications
           </h2>
-          <div className="space-y-sm">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-sm">
             {certifications.map((cert) => (
               <div
                 key={cert._id}
@@ -548,55 +548,57 @@ export default function LearnerProfile() {
   return (
     <div className="space-y-lg">
       {/* ── Profile Card ── */}
-      <Card className="flex flex-col items-center py-xl">
+      <Card className="flex flex-col sm:flex-row items-center justify-center sm:items-start gap-md sm:gap-lg py-xl sm:px-xl">
         {/* Avatar */}
         {fullUser?.profileImage ? (
-          <div className="relative h-[96px] w-[96px] overflow-hidden rounded-full">
+          <div className="relative h-[96px] w-[96px] sm:h-[112px] sm:w-[112px] overflow-hidden rounded-full flex-shrink-0">
             <Image
               src={fullUser.profileImage}
               alt={user.name}
               fill
               unoptimized
               className="object-cover"
-              sizes="96px"
+              sizes="112px"
             />
           </div>
         ) : (
-          <div className="flex h-[96px] w-[96px] items-center justify-center rounded-full bg-primary-light">
-            <span className="text-[32px] font-bold text-primary-main">
+          <div className="flex h-[96px] w-[96px] sm:h-[112px] sm:w-[112px] items-center justify-center rounded-full bg-primary-light flex-shrink-0">
+            <span className="text-[32px] sm:text-[36px] font-bold text-primary-main">
               {getInitials(user.name)}
             </span>
           </div>
         )}
 
-        {/* Name */}
-        <h2 className="mt-md text-h2 text-text-primary text-center">{user.name}</h2>
+        <div className="text-center sm:text-left">
+          {/* Name */}
+          <h2 className="text-h2 sm:text-h1 text-text-primary text-center">{user.name}</h2>
 
-        {/* EMP-ID */}
-        <p className="mt-xs text-body-md text-text-secondary">{user.empId}</p>
+          {/* EMP-ID */}
+          <p className="mt-xs text-body-md text-text-secondary text-center">{user.empId}</p>
 
-        {/* Role Badge */}
-        <div className="mt-sm">
-          <Badge variant="info">Learner</Badge>
-        </div>
-
-        {/* Stats: Domain + Location */}
-        {(fullUser?.domain || fullUser?.location) && (
-          <div className="mt-md flex flex-wrap items-center justify-center gap-sm">
-            {fullUser.domain && (
-              <span className="inline-flex items-center gap-[4px] rounded-full bg-surface-background px-sm py-[4px] text-caption text-text-secondary">
-                <Briefcase className="h-3 w-3" strokeWidth={1.5} />
-                {fullUser.domain}
-              </span>
-            )}
-            {fullUser.location && (
-              <span className="inline-flex items-center gap-[4px] rounded-full bg-surface-background px-sm py-[4px] text-caption text-text-secondary">
-                <MapPin className="h-3 w-3" strokeWidth={1.5} />
-                {fullUser.location}
-              </span>
-            )}
+          {/* Role Badge */}
+          <div className="mt-sm items-center justify-center gap-sm flex">
+            <Badge variant="info">Learner</Badge>
           </div>
-        )}
+
+          {/* Stats: Domain + Location */}
+          {(fullUser?.domain || fullUser?.location) && (
+            <div className="mt-md flex flex-wrap items-center justify-center sm:justify-start gap-sm">
+              {fullUser.domain && (
+                <span className="inline-flex items-center gap-[4px] rounded-full bg-surface-background px-sm py-[4px] text-caption text-text-secondary">
+                  <Briefcase className="h-3 w-3" strokeWidth={1.5} />
+                  {fullUser.domain}
+                </span>
+              )}
+              {fullUser.location && (
+                <span className="inline-flex items-center gap-[4px] rounded-full bg-surface-background px-sm py-[4px] text-caption text-text-secondary">
+                  <MapPin className="h-3 w-3" strokeWidth={1.5} />
+                  {fullUser.location}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
       </Card>
 
       {/* ── Gamification Section ── */}

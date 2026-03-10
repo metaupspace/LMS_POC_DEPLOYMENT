@@ -302,7 +302,7 @@ export default function CoachProfile() {
   return (
     <div className="space-y-lg">
       {/* ── Profile Card ── */}
-      <Card className="flex flex-col items-center py-xl">
+      <Card className="flex flex-col items-center justify-center py-xl">
         {/* Avatar */}
         {fullUser?.profileImage ? (
           <div className="relative h-[96px] w-[96px] overflow-hidden rounded-full">
@@ -327,10 +327,10 @@ export default function CoachProfile() {
         <h2 className="mt-md text-h2 text-text-primary text-center">{user.name}</h2>
 
         {/* EMP-ID */}
-        <p className="mt-xs text-body-md text-text-secondary">{user.empId}</p>
+        <p className="mt-xs text-body-md text-center text-text-secondary">{user.empId}</p>
 
         {/* Role Badge */}
-        <div className="mt-sm">
+        <div className="mt-sm flex items-center gap-xs justify-center">
           <Badge variant="info">Coach</Badge>
         </div>
 

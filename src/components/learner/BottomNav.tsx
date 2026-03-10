@@ -11,11 +11,15 @@ const tabs = [
   { label: 'Profile', href: '/learner/profile', icon: User },
 ];
 
-export default function BottomNavLearner() {
+interface BottomNavLearnerProps {
+  className?: string;
+}
+
+export default function BottomNavLearner({ className = '' }: BottomNavLearnerProps) {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-border-light bg-surface-white shadow-[0_-2px_4px_rgba(0,0,0,0.05)]">
+    <nav className={`fixed bottom-0 left-0 right-0 z-30 border-t border-border-light bg-surface-white shadow-[0_-2px_4px_rgba(0,0,0,0.05)] ${className}`}>
       <div className="flex h-[56px] items-center justify-around">
         {tabs.map((tab) => {
           const active = pathname.startsWith(tab.href);
