@@ -88,7 +88,7 @@ export const POST = withAuth(
       status: 'in_progress',
     });
 
-    let questions = buildQuestions();
+    const questions = buildQuestions();
 
     // Shuffle questions if configured (deterministic based on attempt ID)
     if (test.shuffleQuestions) {

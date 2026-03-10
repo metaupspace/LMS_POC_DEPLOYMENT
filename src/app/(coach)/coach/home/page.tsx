@@ -543,6 +543,7 @@ export default function CoachHome() {
         const ds = getDisplayStatus(s);
         return ds === 'upcoming' || ds === 'ongoing';
       }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [sessions, today, user?.id, tick]
   );
 
@@ -565,6 +566,7 @@ export default function CoachHome() {
             getDisplayStatus(s) === 'completed'
         )
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [sessions, user?.id, tick]
   );
 

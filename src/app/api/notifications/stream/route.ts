@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { type NextRequest } from 'next/server';
 import { sseManager } from '@/lib/sse/sseManager';
 import { verifyAccessToken } from '@/lib/auth/jwt';
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
   let userId: string;
   try {
     const decoded = verifyAccessToken(token);
-    const rawId = decoded.userId || (decoded as Record<string, unknown>).id || (decoded as Record<string, unknown>)._id;
+    const rawId = decoded.userId || (decoded as unknown as Record<string, unknown>).id || (decoded as unknown as Record<string, unknown>)._id;
     userId = rawId ? String(rawId) : '';
     if (!userId) throw new Error('No user ID in token');
   } catch (err) {

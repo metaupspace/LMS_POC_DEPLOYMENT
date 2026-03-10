@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import Image from 'next/image';
 import { X, Download, ExternalLink } from 'lucide-react';
 
 interface ImageModalProps {
@@ -92,10 +93,13 @@ export default function ImageModal({ isOpen, onClose, imageUrl, fileName }: Imag
           />
         ) : (
           <div className="flex items-center justify-center bg-black/20 rounded-md overflow-hidden">
-            <img
+            <Image
               src={imageUrl}
               alt={fileName || 'Proof of Work'}
+              width={800}
+              height={600}
               className="max-w-full max-h-[80vh] object-contain"
+              unoptimized
             />
           </div>
         )}

@@ -114,6 +114,7 @@ export default function SessionsListPage() {
   const statusFilteredSessions = useMemo(() => {
     if (!status) return allFetchedSessions;
     return allFetchedSessions.filter((s) => getDisplayStatus(s) === status);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allFetchedSessions, status, tick]);
 
   // Client-side pagination

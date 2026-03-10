@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import type { Channel, ConsumeMessage } from 'amqplib';
 import { QUEUE_NAMES } from '../connection';
 import type { QueueMessage } from '../producer';

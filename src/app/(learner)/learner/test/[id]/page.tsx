@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Image from 'next/image';
 import {
   useStartTestMutation,
   useSubmitTestMutation,
@@ -216,7 +217,6 @@ export default function ProctoredTestPage() {
     document.addEventListener('keydown', blockKeys);
 
     document.body.style.userSelect = 'none';
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (document.body.style as any).webkitUserSelect = 'none';
 
     return () => {
@@ -226,7 +226,6 @@ export default function ProctoredTestPage() {
       document.removeEventListener('contextmenu', blockContextMenu);
       document.removeEventListener('keydown', blockKeys);
       document.body.style.userSelect = '';
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (document.body.style as any).webkitUserSelect = '';
     };
   }, [phase, addViolation]);
@@ -686,10 +685,13 @@ export default function ProctoredTestPage() {
               {question.questionText}
             </p>
             {question.questionImage && (
-              <img
+              <Image
                 src={question.questionImage}
                 alt=""
+                width={400}
+                height={300}
                 className="max-h-48 rounded-md mb-4"
+                unoptimized
               />
             )}
             <p className="text-caption text-text-secondary">
@@ -730,10 +732,13 @@ export default function ProctoredTestPage() {
                     <span className="text-body-md">{opt.text}</span>
                   </div>
                   {opt.image && (
-                    <img
+                    <Image
                       src={opt.image}
                       alt=""
+                      width={400}
+                      height={200}
                       className="mt-2 max-h-32 rounded"
+                      unoptimized
                     />
                   )}
                 </button>

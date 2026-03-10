@@ -50,8 +50,10 @@ function getDisplayStatus(session: SessionData): 'upcoming' | 'ongoing' | 'compl
   if (session.status === 'completed') return 'completed';
 
   const sessionDate = new Date(session.date);
-  const [hours, minutes] = (session.timeSlot ?? '').split(':').map(Number);
-  if (!isNaN(hours) && !isNaN(minutes)) {
+  const parts = (session.timeSlot ?? '').split(':').map(Number);
+  const hours = parts[0];
+  const minutes = parts[1];
+  if (hours !== undefined && minutes !== undefined && !isNaN(hours) && !isNaN(minutes)) {
     sessionDate.setHours(hours, minutes, 0, 0);
   }
 
@@ -363,16 +365,19 @@ export default function LearnerSessions() {
   // Categorize by display status
   const ongoingSessions = useMemo(() => {
     return userSessions.filter((s) => getDisplayStatus(s) === 'ongoing');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userSessions, tick]);
 
   const upcomingSessions = useMemo(() => {
     return userSessions.filter((s) => getDisplayStatus(s) === 'upcoming');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userSessions, tick]);
 
   const completedSessions = useMemo(() => {
     return userSessions
       .filter((s) => getDisplayStatus(s) === 'completed')
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userSessions, tick]);
 
   // Apply attendance filter to completed sessions

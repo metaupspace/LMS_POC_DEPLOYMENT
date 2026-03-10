@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   Users,
   ClipboardCheck,
-  Clock,
   Trophy,
   BarChart3,
   Pencil,

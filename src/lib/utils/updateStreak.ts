@@ -13,7 +13,7 @@ export async function updateStreak(userId: string): Promise<void> {
   try {
     await connectDB();
 
-    let gam = await Gamification.findOne({ user: userId });
+    const gam = await Gamification.findOne({ user: userId });
 
     if (!gam) {
       await Gamification.create({

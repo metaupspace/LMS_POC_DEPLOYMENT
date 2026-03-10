@@ -34,8 +34,6 @@ import { useChangePasswordMutation, useLogoutMutation } from '@/store/slices/api
 import {
   useGetCertificationsQuery,
   useGetTestsQuery,
-  type CertificationData,
-  type TestData as TestDataType,
 } from '@/store/slices/api/testApi';
 import { Card, Badge, Button, Input, ConfirmDialog, LoadingSpinner } from '@/components/ui';
 import { LanguageSwitcher, HelpCenter } from '@/components/shared';

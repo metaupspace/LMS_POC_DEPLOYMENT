@@ -23,7 +23,7 @@ interface VideoPlayerProps {
   title?: string;
   subtitle?: string; // VTT URL
   downloadable?: boolean;
-  onProgress?: (percent: number) => void;
+  onProgress?: (_percent: number) => void;
   onEnded?: () => void;
   className?: string;
 }
@@ -65,7 +65,7 @@ export default function VideoPlayer(props: VideoPlayerProps) {
 
 interface YouTubePlayerProps {
   src: string;
-  onProgress?: (percent: number) => void;
+  onProgress?: (_percent: number) => void;
   onEnded?: () => void;
   className?: string;
 }
@@ -205,8 +205,8 @@ interface YTStateChangeEvent {
 interface WindowWithYT {
   YT?: {
     Player: new (
-      id: string,
-      opts: Record<string, unknown>,
+      _id: string,
+      _opts: Record<string, unknown>,
     ) => YTPlayer;
     PlayerState?: YTPlayerState;
   };

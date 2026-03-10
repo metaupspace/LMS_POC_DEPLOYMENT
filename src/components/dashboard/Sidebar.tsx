@@ -11,7 +11,6 @@ import {
   CalendarDays,
   BarChart3,
   ClipboardCheck,
-  FileText,
   X,
 } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';

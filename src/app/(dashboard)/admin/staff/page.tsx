@@ -14,7 +14,6 @@ import {
 } from '@/store/slices/api/userApi';
 import {
   Button,
-  Card,
   Table,
   Badge,
   SearchBar,

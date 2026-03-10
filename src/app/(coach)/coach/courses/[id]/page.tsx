@@ -384,10 +384,13 @@ function ProofCard({ proof, userMap }: ProofCardProps) {
           className="inline-flex items-center gap-sm text-body-md font-medium text-primary-main min-h-[44px] hover:opacity-80 transition-opacity"
         >
           {proof.fileUrl.match(/\.(jpg|jpeg|png|webp)/i) ? (
-            <img
+            <Image
               src={proof.fileUrl}
               alt="Proof"
+              width={56}
+              height={56}
               className="w-14 h-14 object-cover rounded-sm border border-border-light"
+              unoptimized
             />
           ) : (
             <div className="w-14 h-14 bg-surface-background rounded-sm border border-border-light flex items-center justify-center">

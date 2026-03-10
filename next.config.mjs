@@ -1,7 +1,14 @@
+import nextPWA from '@ducanh2912/next-pwa';
+
+const withPWA = nextPWA({
+  dest: 'public',
+  register: true,
+  skipWaiting: true,
+  disable: process.env.NODE_ENV === 'development',
+});
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-  poweredByHeader: false,
   output: 'standalone',
   experimental: {
     instrumentationHook: true,
@@ -16,4 +23,4 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default withPWA(nextConfig);

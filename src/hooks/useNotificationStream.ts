@@ -1,9 +1,10 @@
 'use client';
+/* eslint-disable no-console */
 
 import { useEffect, useRef } from 'react';
 import { useAppSelector } from '@/store/hooks';
 
-type NotificationHandler = (notification: Record<string, unknown>) => void;
+type NotificationHandler = (_notification: Record<string, unknown>) => void;
 
 export function useNotificationStream(onNotification: NotificationHandler) {
   const accessToken = useAppSelector((state) => state.auth.accessToken);

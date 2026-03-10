@@ -26,7 +26,7 @@ export const GET = withAuth(
 
       // Sync status before returning
       const computed = await syncSessionStatus(session);
-      session.status = computed;
+      session.status = computed as typeof session.status;
 
       return successResponse(session, 'Session retrieved successfully');
     } catch (err) {

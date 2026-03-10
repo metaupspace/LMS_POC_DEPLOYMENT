@@ -9,7 +9,6 @@ import { successResponse, errorResponse } from '@/lib/utils/apiResponse';
 import { submitTestSchema } from '@/lib/validators/test';
 import { publishToQueue } from '@/lib/rabbitmq/producer';
 import { QUEUE_NAMES } from '@/lib/rabbitmq/connection';
-import { POINTS } from '@/lib/constants';
 
 const CERTIFICATION_POINTS = 50;
 

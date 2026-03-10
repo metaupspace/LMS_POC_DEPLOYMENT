@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 type SSEClient = {
   userId: string;
   controller: ReadableStreamDefaultController;

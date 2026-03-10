@@ -5,8 +5,8 @@ import { Upload, X, Film, Loader2, Play } from 'lucide-react';
 
 interface VideoUploadProps {
   value?: string;
-  onChange: (url: string) => void;
-  onDurationDetected?: (seconds: number) => void;
+  onChange: (_url: string) => void;
+  onDurationDetected?: (_seconds: number) => void;
 }
 
 const ALLOWED_TYPES = [
