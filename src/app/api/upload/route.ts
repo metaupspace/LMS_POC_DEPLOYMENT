@@ -42,6 +42,7 @@ export const POST = withAuth(
       return successResponse(
         {
           url: result.url,
+          hlsUrl: result.hlsUrl ?? null,
           publicId: result.publicId,
           format: result.format,
           size: result.size,

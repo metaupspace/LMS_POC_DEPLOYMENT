@@ -88,6 +88,36 @@ export const NotificationType = {
   BADGE_EARNED: 'badge_earned',
   STREAK: 'streak',
   GENERAL: 'general',
+  TEST_ASSIGNED: 'test_assigned',
+  CERTIFICATION_EARNED: 'certification_earned',
 } as const;
+
+export const TestStatus = {
+  DRAFT: 'draft',
+  ACTIVE: 'active',
+  ARCHIVED: 'archived',
+} as const;
+
+export type TestStatus = (typeof TestStatus)[keyof typeof TestStatus];
+
+export const TestAttemptStatus = {
+  IN_PROGRESS: 'in_progress',
+  SUBMITTED: 'submitted',
+  GRADED: 'graded',
+  EXPIRED: 'expired',
+} as const;
+
+export type TestAttemptStatus = (typeof TestAttemptStatus)[keyof typeof TestAttemptStatus];
+
+export const ViolationType = {
+  TAB_SWITCH: 'tab_switch',
+  MINIMIZE: 'minimize',
+  COPY_PASTE: 'copy_paste',
+  SCREENSHOT: 'screenshot',
+  DEVTOOLS: 'devtools',
+  OTHER: 'other',
+} as const;
+
+export type ViolationType = (typeof ViolationType)[keyof typeof ViolationType];
 
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType];

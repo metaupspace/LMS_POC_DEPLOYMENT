@@ -160,6 +160,7 @@ function VideoContentView({ content, onComplete, isCompleted }: VideoContentView
     <div className="space-y-md">
       <VideoPlayer
         src={content.data}
+        hlsUrl={content.hlsUrl}
         title={content.title}
         downloadable={content.downloadable}
         onProgress={(percent) => {
@@ -1271,6 +1272,7 @@ function ReviewPhase({
                 {content.type === 'video' ? (
                   <VideoPlayer
                     src={content.data}
+                    hlsUrl={content.hlsUrl}
                     title={content.title}
                     downloadable={content.downloadable}
                   />

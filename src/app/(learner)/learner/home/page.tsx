@@ -15,6 +15,7 @@ import {
   CalendarDays,
   Video,
   ExternalLink,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Card, Badge, Button } from '@/components/ui';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
@@ -23,6 +24,7 @@ import {
   useGetUserGamificationQuery,
   useUpdateStreakMutation,
 } from '@/store/slices/api/gamificationApi';
+import { useGetTestsQuery, type TestData } from '@/store/slices/api/testApi';
 import {
   useGetSessionsQuery,
   useMarkAttendanceMutation,
@@ -58,7 +60,9 @@ function getSessionDisplayStatus(session: SessionData): 'upcoming' | 'ongoing' |
   if (session.status === 'completed') return 'completed';
 
   const sessionDate = new Date(session.date);
-  const [hours, minutes] = (session.timeSlot ?? '').split(':').map(Number);
+  const [hoursStr, minutesStr] = (session.timeSlot ?? '').split(':');
+  const hours = parseInt(hoursStr ?? '0', 10);
+  const minutes = parseInt(minutesStr ?? '0', 10);
   if (!isNaN(hours) && !isNaN(minutes)) {
     sessionDate.setHours(hours, minutes, 0, 0);
   }
@@ -561,6 +565,7 @@ function CourseLearningCard({ course, modules, progressMap }: CourseLearningCard
 // ─── Main Page Component ───────────────────────────────────
 
 export default function LearnerHome() {
+  const router = useRouter();
   const user = useAppSelector((s) => s.auth.user);
   const streakUpdatedRef = useRef(false);
 
@@ -585,6 +590,11 @@ export default function LearnerHome() {
 
   const { data: modulesResponse, isLoading: isLoadingModules } = useGetModulesQuery(
     { limit: 200 },
+    { skip: !user?.id }
+  );
+
+  const { data: testsResponse } = useGetTestsQuery(
+    { status: 'active', limit: 10 },
     { skip: !user?.id }
   );
 
@@ -694,6 +704,25 @@ export default function LearnerHome() {
     return map;
   }, [modules, assignedCourses]);
 
+  // Assigned tests — filter out certified and exhausted tests
+  const assignedTests = useMemo(() => {
+    const allTests = (testsResponse?.data ?? []) as TestData[];
+    return allTests.filter((test) => {
+      // Hide if already certified
+      if (test.myCertification) return false;
+
+      // Hide if all attempts exhausted
+      if (test.myAttempts) {
+        const gradedAttempts = test.myAttempts.filter(
+          (a) => a.status === 'graded'
+        ).length;
+        if (gradedAttempts >= test.maxAttempts) return false;
+      }
+
+      return true;
+    });
+  }, [testsResponse]);
+
   // Learning courses: in-progress first, then not-started, exclude completed
   const learningCourses = useMemo(() => {
     const inProgress: CourseData[] = [];
@@ -791,6 +820,52 @@ export default function LearnerHome() {
           </div>
         </section>
       ) : null}
+
+      {/* ── Section 2.5: Certification Tests ── */}
+      {assignedTests.length > 0 && (
+        <section>
+          <h2 className="text-h3 font-semibold text-text-primary flex items-center gap-sm">
+            <ClipboardCheck className="h-5 w-5" /> Certification Tests
+          </h2>
+          <div className="mt-md space-y-sm">
+            {assignedTests.map((test) => {
+              const hasCert = !!test.myCertification;
+              const attempts = test.myAttempts?.length ?? 0;
+              const maxedOut = attempts >= test.maxAttempts;
+
+              return (
+                <Card key={test._id} className="flex items-center justify-between gap-md">
+                  <div className="min-w-0 space-y-xs border-l-4 border-primary-main pl-md">
+                    <p className="text-body-md font-medium text-text-primary truncate">
+                      {test.title}
+                    </p>
+                    <p className="text-caption text-primary-main">{test.certificationTitle}</p>
+                    <p className="text-caption text-text-secondary">
+                      {test.questions?.length || 0} questions
+                      {test.timeLimitMinutes > 0 && ` \u00B7 ${test.timeLimitMinutes} min`}
+                      {` \u00B7 ${test.passingScore}% to pass`}
+                    </p>
+                  </div>
+                  <div className="flex-shrink-0 mt-2">
+                    {hasCert ? (
+                      <Badge variant="success">Certified</Badge>
+                    ) : maxedOut ? (
+                      <Badge variant="error">No attempts left</Badge>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() => router.push(`/learner/test/${test._id}`)}
+                      >
+                        Take Test
+                      </Button>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* ── Section 3: Continue Learning / Today's Task ── */}
       <section>

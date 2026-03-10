@@ -53,7 +53,8 @@
     "assignCourse": "Assign Course",
     "addManager": "Add Manager",
     "addCoach": "Add Coach",
-    "addStaff": "Add Staff"
+    "addStaff": "Add Staff",
+      "createTest": "Create Test"
   },
   "users": {
     "managers": "Managers",
@@ -239,6 +240,9 @@
     "trackProgressDesc": "Build streaks, unlock badges, and see your growth on the leaderboard.",
     "getStarted": "Get Started",
     "completeSetup": "Complete Setup"
+  },
+  "tests": {
+    "tests": "Tests"
   },
   "reports": {
     "reports": "Reports",

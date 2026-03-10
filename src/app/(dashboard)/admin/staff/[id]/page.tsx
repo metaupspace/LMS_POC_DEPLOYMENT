@@ -32,6 +32,7 @@ import {
 } from '@/store/slices/api/userApi';
 import { useGetUserGamificationQuery } from '@/store/slices/api/gamificationApi';
 import { useGetUserProgressQuery } from '@/store/slices/api/progressApi';
+import { useGetCertificationsQuery, type CertificationData } from '@/store/slices/api/testApi';
 import type { ProgressData } from '@/store/slices/api/progressApi';
 import type { BadgeData } from '@/store/slices/api/gamificationApi';
 import { updateUserSchema, type UpdateUserInput } from '@/lib/validators/user';
@@ -129,9 +130,14 @@ export default function StaffDetailPage() {
     data: progressResponse,
     isLoading: progressLoading,
   } = useGetUserProgressQuery(id);
+  const {
+    data: certsResponse,
+    isLoading: certsLoading,
+  } = useGetCertificationsQuery(id);
 
   const staff = userResponse?.data;
   const gamification = gamificationResponse?.data;
+  const certifications = (certsResponse?.data ?? []) as CertificationData[];
 
   // The /progress/[userId] API returns grouped data: { course, modules }[]
   // Flatten it into a table-friendly format
@@ -669,6 +675,70 @@ export default function StaffDetailPage() {
                   </div>
                 </Card>
               )}
+
+              {/* Certifications */}
+              <Card
+                header={
+                  <div className="flex items-center gap-sm">
+                    <Award className="h-5 w-5 text-amber-500" />
+                    <h3 className="text-h3 text-text-primary">Certifications</h3>
+                    {certifications.length > 0 && (
+                      <span className="text-body-md font-normal text-text-secondary">
+                        ({certifications.length})
+                      </span>
+                    )}
+                  </div>
+                }
+              >
+                {certsLoading ? (
+                  <div className="flex items-center justify-center py-lg">
+                    <LoadingSpinner variant="inline" text="Loading certifications..." />
+                  </div>
+                ) : certifications.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-lg text-center">
+                    <Award className="h-9 w-9 text-text-disabled" />
+                    <p className="mt-sm text-body-md text-text-secondary">
+                      No certifications earned yet
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-sm">
+                    {certifications.map((cert) => {
+                      const testObj = typeof cert.test === 'object' ? cert.test : null;
+                      return (
+                        <div
+                          key={cert._id}
+                          className="flex items-center justify-between rounded-md border border-amber-100 bg-amber-50/30 p-md"
+                        >
+                          <div className="flex items-center gap-md min-w-0">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100">
+                              <Award className="h-5 w-5 text-amber-500" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-body-md font-semibold text-primary-main truncate">
+                                {cert.title}
+                              </p>
+                              {testObj && (
+                                <p className="text-caption text-text-secondary truncate">
+                                  {testObj.title}
+                                </p>
+                              )}
+                              <div className="mt-xs flex items-center gap-md text-caption text-text-secondary">
+                                <span className="font-medium text-success">
+                                  Score: {cert.score}%
+                                </span>
+                                <span>
+                                  Earned: {formatDate(cert.earnedAt)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </Card>
             </>
           )}
         </div>

@@ -7,6 +7,8 @@ export interface ModuleContentData {
   type: 'video' | 'text';
   title: string;
   data: string;
+  hlsUrl?: string | null;
+  publicId?: string | null;
   duration: number;
   downloadable: boolean;
 }

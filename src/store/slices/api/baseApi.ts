@@ -111,6 +111,8 @@ export const baseApi = createApi({
     'ProofOfWork',
     'Gamification',
     'Notification',
+    'Test',
+    'Certification',
   ],
   endpoints: () => ({}),
 });

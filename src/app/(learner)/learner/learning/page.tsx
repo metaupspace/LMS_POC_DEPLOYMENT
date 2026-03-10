@@ -17,8 +17,10 @@ import {
   Timer,
   Circle,
   ClipboardList,
+  ClipboardCheck,
   Video,
   ExternalLink,
+  Award,
 } from 'lucide-react';
 import { Card, Badge, Button } from '@/components/ui';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
@@ -31,6 +33,7 @@ import {
 import { useGetProgressQuery, type ProgressData } from '@/store/slices/api/progressApi';
 import { useGetCoursesQuery, type CourseData } from '@/store/slices/api/courseApi';
 import { useGetModulesQuery, getQuizId, type ModuleData } from '@/store/slices/api/moduleApi';
+import { useGetTestsQuery, useGetCertificationsQuery, type TestData, type CertificationData } from '@/store/slices/api/testApi';
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -66,7 +69,7 @@ function getSessionDisplayStatus(session: SessionData): 'upcoming' | 'ongoing' |
   if (session.status === 'completed') return 'completed';
 
   const sessionDate = new Date(session.date);
-  const [hours, minutes] = (session.timeSlot ?? '').split(':').map(Number);
+  const [hours = NaN, minutes = NaN] = (session.timeSlot ?? '').split(':').map(Number);
   if (!isNaN(hours) && !isNaN(minutes)) {
     sessionDate.setHours(hours, minutes, 0, 0);
   }
@@ -655,6 +658,7 @@ function SessionPastCard({ session, userId }: SessionPastCardProps) {
 // ─── Main Page Component ────────────────────────────────────
 
 export default function MyLearning() {
+  const router = useRouter();
   const user = useAppSelector((s) => s.auth.user);
   const [activeTab, setActiveTab] = useState<TabKey>('ongoing');
 
@@ -683,6 +687,16 @@ export default function MyLearning() {
 
   const { data: modulesResponse, isLoading: isLoadingModules } = useGetModulesQuery(
     { limit: 200 },
+    { skip: !user?.id }
+  );
+
+  const { data: allTestsResponse } = useGetTestsQuery(
+    { includeCompleted: true },
+    { skip: !user?.id }
+  );
+
+  const { data: certsResponse } = useGetCertificationsQuery(
+    undefined,
     { skip: !user?.id }
   );
 
@@ -774,6 +788,53 @@ export default function MyLearning() {
       (s) => isPastDate(s.date, today) || s.status === 'completed'
     );
   }, [userSessions, today]);
+
+  // ── Certification tests ──
+  const allTests = useMemo(
+    () => (allTestsResponse?.data ?? []) as TestData[],
+    [allTestsResponse]
+  );
+
+  const certifications = useMemo(
+    () => (certsResponse?.data ?? []) as CertificationData[],
+    [certsResponse]
+  );
+
+  const certMap = useMemo(() => {
+    const map = new Map<string, CertificationData>();
+    for (const c of certifications) {
+      const testId = (typeof c.test === 'object' ? c.test._id : c.test)?.toString();
+      if (testId) map.set(testId, c);
+    }
+    return map;
+  }, [certifications]);
+
+  const certifiedTests = useMemo(
+    () => allTests.filter((t) => t.myStatus === 'certified' || certMap.has(t._id)),
+    [allTests, certMap]
+  );
+
+  const exhaustedTests = useMemo(
+    () =>
+      allTests.filter((t) => {
+        if (t.myStatus === 'certified' || certMap.has(t._id)) return false;
+        if (t.myStatus === 'exhausted') return true;
+        const attempts = t.myAttemptCount ?? t.myAttempts?.filter((a) => a.status === 'graded').length ?? 0;
+        return attempts >= t.maxAttempts;
+      }),
+    [allTests, certMap]
+  );
+
+  const pendingTests = useMemo(
+    () =>
+      allTests.filter((t) => {
+        if (t.myStatus === 'certified' || certMap.has(t._id)) return false;
+        if (t.myStatus === 'exhausted') return false;
+        const attempts = t.myAttemptCount ?? t.myAttempts?.filter((a) => a.status === 'graded').length ?? 0;
+        return attempts < t.maxAttempts;
+      }),
+    [allTests, certMap]
+  );
 
   // ── Tab counts ──
   const tabCounts: Record<TabKey, number> = useMemo(() => ({
@@ -971,6 +1032,138 @@ export default function MyLearning() {
                 </div>
               )}
             </>
+          )}
+        </section>
+      )}
+
+      {/* ── Certification Tests Section ── */}
+      {allTests.length > 0 && (
+        <section className="space-y-md">
+          <h2 className="text-h2 font-semibold text-text-primary flex items-center gap-sm">
+            <ClipboardCheck className="h-5 w-5" /> Certification Tests
+          </h2>
+
+          {/* Earned Certifications */}
+          {certifiedTests.length > 0 && (
+            <div>
+              <h3 className="text-body-md font-medium text-text-secondary mb-sm">
+                Earned ({certifiedTests.length})
+              </h3>
+              <div className="space-y-sm">
+                {certifiedTests.map((test) => {
+                  const cert = certMap.get(test._id);
+                  return (
+                    <Card key={test._id} className="border-success/30">
+                      <div className="flex items-start justify-between gap-md">
+                        <div className="flex items-start gap-sm min-w-0">
+                          <div className="w-10 h-10 bg-amber-50 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <Award className="h-5 w-5 text-amber-500" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-body-md font-medium text-text-primary truncate">
+                              {test.title}
+                            </p>
+                            <p className="text-body-md font-semibold text-primary-main mt-0.5">
+                              {cert?.title || test.certificationTitle}
+                            </p>
+                            <div className="flex items-center gap-md mt-xs text-caption text-text-secondary">
+                              <span className="text-success font-medium">
+                                Score: {cert?.score ?? test.myBestScore ?? '—'}%
+                              </span>
+                              {cert?.earnedAt && (
+                                <span>{formatDate(cert.earnedAt)}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <Badge variant="success">Certified</Badge>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Pending Tests */}
+          {pendingTests.length > 0 && (
+            <div>
+              <h3 className="text-body-md font-medium text-text-secondary mb-sm">
+                Pending ({pendingTests.length})
+              </h3>
+              <div className="space-y-sm">
+                {pendingTests.map((test) => {
+                  const attempts = test.myAttemptCount ?? 0;
+                  return (
+                    <Card
+                      key={test._id}
+                      className="cursor-pointer hover:border-primary-main/30 transition-colors"
+                      onClick={() => router.push(`/learner/test/${test._id}`)}
+                    >
+                      <div className="flex items-center justify-between gap-md">
+                        <div className="flex items-center gap-sm min-w-0">
+                          <div className="w-10 h-10 bg-primary-light rounded-full flex items-center justify-center flex-shrink-0">
+                            <ClipboardCheck className="h-5 w-5 text-primary-main" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-body-md font-medium text-text-primary truncate">
+                              {test.title}
+                            </p>
+                            <p className="text-caption text-text-secondary">
+                              Earn: &ldquo;{test.certificationTitle}&rdquo;
+                            </p>
+                            <div className="flex items-center gap-md mt-xs text-caption text-text-secondary">
+                              <span>{test.questions?.length || 0} questions</span>
+                              <span>Pass: {test.passingScore}%</span>
+                              {attempts > 0 && (
+                                <span className="text-amber-500 font-medium">
+                                  {attempts}/{test.maxAttempts} attempted
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <ChevronRight className="h-5 w-5 text-text-secondary flex-shrink-0" />
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Exhausted Tests */}
+          {exhaustedTests.length > 0 && (
+            <div>
+              <h3 className="text-body-md font-medium text-text-secondary mb-sm">
+                Exhausted ({exhaustedTests.length})
+              </h3>
+              <div className="space-y-sm">
+                {exhaustedTests.map((test) => (
+                  <Card key={test._id} className="opacity-70">
+                    <div className="flex items-start justify-between gap-md">
+                      <div className="flex items-center gap-sm min-w-0">
+                        <div className="w-10 h-10 bg-surface-background rounded-full flex items-center justify-center flex-shrink-0">
+                          <ClipboardCheck className="h-5 w-5 text-text-disabled" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-body-md font-medium text-text-secondary truncate">
+                            {test.title}
+                          </p>
+                          <p className="text-caption text-text-disabled">
+                            &ldquo;{test.certificationTitle}&rdquo;
+                          </p>
+                          <p className="text-caption text-text-disabled mt-xs">
+                            Best score: {test.myBestScore ?? '—'}% · All {test.maxAttempts} attempt{test.maxAttempts > 1 ? 's' : ''} used
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant="error">Failed</Badge>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
           )}
         </section>
       )}

@@ -13,6 +13,10 @@ import {
   Activity,
   Clock,
   MapPin,
+  ClipboardCheck,
+  Award,
+  TrendingUp,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAppSelector } from '@/store/hooks';
 import { useGetDashboardStatsQuery } from '@/store/slices/api/dashboardApi';
@@ -72,6 +76,9 @@ const statCards: StatCardConfig[] = [
     adminOnly: true,
   },
 ];
+
+
+
 
 function getDisplayStatus(session: { status: string; date: string; timeSlot: string; duration?: number }): string {     
       if (session.status !== 'upcoming') return session.status;                                                                                                                                                                                     
@@ -222,7 +229,8 @@ export default function DashboardHome() {
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-md sm:grid-cols-3 lg:grid-cols-5">
         {visibleStatCards.map((card) => {
-          const value = stats[card.key as keyof typeof stats] ?? 0;
+          const rawValue = stats[card.key as keyof typeof stats] ?? 0;
+          const value = typeof rawValue === 'number' ? rawValue : 0;
           return (
             <Card key={card.key}>
               <div className="flex items-center gap-md">
@@ -244,6 +252,51 @@ export default function DashboardHome() {
           );
         })}
       </div>
+
+      {/* Test Stats */}
+      {stats.tests && (
+        <div className="grid grid-cols-2 gap-md sm:grid-cols-3">
+          <Card>
+            <div className="flex items-center gap-md">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-50">
+                <ClipboardCheck className="h-5 w-5 text-violet-600" />
+              </div>
+              <div>
+                <p className="text-h1 font-semibold text-text-primary">
+                  {stats.tests.active}
+                </p>
+                <p className="text-caption text-text-secondary">Active Tests</p>
+              </div>
+            </div>
+          </Card>
+          <Card>
+            <div className="flex items-center gap-md">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-50">
+                <Award className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-h1 font-semibold text-text-primary">
+                  {stats.tests.totalCertifications}
+                </p>
+                <p className="text-caption text-text-secondary">Certifications Earned</p>
+              </div>
+            </div>
+          </Card>
+          <Card>
+            <div className="flex items-center gap-md">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-50">
+                <TrendingUp className="h-5 w-5 text-success" />
+              </div>
+              <div>
+                <p className="text-h1 font-semibold text-text-primary">
+                  {stats.tests.passRate}%
+                </p>
+                <p className="text-caption text-text-secondary">Test Pass Rate</p>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Two Column Layout: Recent Activities + Quick Actions */}
       <div className="grid grid-cols-1 gap-md lg:grid-cols-3">
@@ -345,6 +398,15 @@ export default function DashboardHome() {
               >
                 {t('dashboard.assignCourse')}
               </Button>
+              <Button
+                variant="primary"
+                size="md"
+                isBlock
+                leftIcon={<ClipboardCheck className="h-4 w-4" />}
+                onClick={() => router.push('/admin/tests/create')}
+              >
+                {t('dashboard.createTest')}
+              </Button>
             </div>
           </Card>
         </div>
@@ -431,6 +493,82 @@ export default function DashboardHome() {
           </div>
         )}
       </div>
+
+      {/* Recent Test Activity */}
+      {stats.tests?.recentAttempts && stats.tests.recentAttempts.length > 0 && (
+        <div>
+          <div className="mb-md flex items-center justify-between">
+            <h2 className="text-h2 text-text-primary">Recent Test Activity</h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              rightIcon={<ArrowRight className="h-4 w-4" />}
+              onClick={() => router.push('/admin/tests')}
+            >
+              {t('common.viewAll')}
+            </Button>
+          </div>
+          <Card>
+            <ul className="divide-y divide-border-light">
+              {stats.tests.recentAttempts.map((attempt) => (
+                <li
+                  key={attempt._id}
+                  className="flex items-center justify-between py-md first:pt-0 last:pb-0"
+                >
+                  <div className="flex items-center gap-md">
+                    <div
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                        attempt.passed ? 'bg-green-50' : 'bg-red-50'
+                      }`}
+                    >
+                      <span className="text-caption">
+                        {attempt.passed ? '\u2705' : '\u274C'}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-body-md text-text-primary">
+                        <span className="font-medium">
+                          {attempt.user?.name ?? 'Unknown'}
+                        </span>
+                        {attempt.passed ? ' passed ' : ' failed '}
+                        <span className="font-medium">
+                          {attempt.test?.title ?? 'Unknown Test'}
+                        </span>
+                      </p>
+                      {attempt.passed && attempt.test?.certificationTitle && (
+                        <p className="text-caption text-primary-main">
+                          {'\u{1F3C6}'} Earned: {attempt.test.certificationTitle}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p
+                      className={`text-body-md font-semibold ${
+                        attempt.passed ? 'text-success' : 'text-error'
+                      }`}
+                    >
+                      {attempt.score}%
+                    </p>
+                    <p className="text-caption text-text-secondary">
+                      {attempt.submittedAt
+                        ? getRelativeTime(attempt.submittedAt)
+                        : ''}
+                    </p>
+                    {attempt.totalViolations > 0 && (
+                      <p className="text-caption text-warning flex items-center gap-xs justify-end">
+                        <AlertTriangle className="h-3 w-3" />
+                        {attempt.totalViolations} violation
+                        {attempt.totalViolations > 1 ? 's' : ''}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

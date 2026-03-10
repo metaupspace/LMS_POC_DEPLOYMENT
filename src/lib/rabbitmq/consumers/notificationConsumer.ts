@@ -119,6 +119,15 @@ function buildNotification(
         type,
         metadata: payload,
       };
+      case 'test_assigned':
+        return {
+          title: 'New Test Assigned',
+          message: payload.testTitle
+            ? `You have been assigned the test "${payload.testTitle}".`
+            : 'You have been assigned a new test.',
+          type,
+          metadata: payload,
+        };
     default:
       return {
         title: payload.title ?? 'Notification',

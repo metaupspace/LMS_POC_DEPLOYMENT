@@ -10,6 +10,7 @@ import {
   BookOpen,
   CalendarDays,
   BarChart3,
+  ClipboardCheck,
   FileText,
   X,
 } from 'lucide-react';
@@ -31,6 +32,7 @@ const navItems: NavItem[] = [
   { labelKey: 'users.staff', href: '/admin/staff', icon: Users, roles: ['admin', 'manager'] },
   { labelKey: 'courses.courses', href: '/admin/courses', icon: BookOpen, roles: ['admin', 'manager'] },
   { labelKey: 'sessions.trainingSessions', href: '/admin/sessions', icon: CalendarDays, roles: ['admin', 'manager'] },
+  { labelKey: 'tests.tests', href: '/admin/tests', icon: ClipboardCheck, roles: ['admin', 'manager'] },
   { labelKey: 'reports.reports', href: '/admin/reports', icon: BarChart3, roles: ['admin', 'manager'] },
   // { labelKey: 'API Docs', href: '/api-docs', icon: FileText, roles: ['admin'] },
 ];

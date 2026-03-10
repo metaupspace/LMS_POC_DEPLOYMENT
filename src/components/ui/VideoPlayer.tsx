@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import Hls from 'hls.js';
+import { getHlsUrl } from '@/lib/utils/getStreamingUrl';
 import {
   Play,
   Pause,
@@ -11,10 +13,13 @@ import {
   Download,
   Volume2,
   VolumeX,
+  Settings,
+  Wifi,
 } from 'lucide-react';
 
 interface VideoPlayerProps {
   src: string;
+  hlsUrl?: string | null;
   title?: string;
   subtitle?: string; // VTT URL
   downloadable?: boolean;
@@ -212,6 +217,7 @@ interface WindowWithYT {
 
 function DirectVideoPlayer({
   src,
+  hlsUrl,
   title,
   subtitle,
   downloadable = false,
@@ -221,6 +227,7 @@ function DirectVideoPlayer({
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
 
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -228,8 +235,78 @@ function DirectVideoPlayer({
   const [muted, setMuted] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [error, setError] = useState(false);
+  const [buffering, setBuffering] = useState(false);
+  const [currentBitrate, setCurrentBitrate] = useState('');
+  const [quality, setQuality] = useState('Auto');
+  const [availableQualities, setAvailableQualities] = useState<
+    Array<{ height: number; label: string; index: number }>
+  >([]);
+  const [showQuality, setShowQuality] = useState(false);
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+  // Determine the best streaming URL
+  const streamUrl = hlsUrl || getHlsUrl(src);
+  const useHls = !!streamUrl;
+
+  // HLS setup
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return undefined;
+
+    if (useHls && Hls.isSupported()) {
+      const hls = new Hls({
+        startLevel: -1,
+        capLevelToPlayerSize: true,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        abrBandWidthFactor: 0.8,
+        abrBandWidthUpFactor: 0.5,
+      });
+
+      hls.loadSource(streamUrl!);
+      hls.attachMedia(video);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
+        const qualities = data.levels.map((level, idx) => ({
+          height: level.height,
+          label: `${level.height}p`,
+          index: idx,
+        }));
+        setAvailableQualities(qualities);
+      });
+
+      hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
+        const level = hls.levels[data.level];
+        if (level) {
+          setCurrentBitrate(`${level.height}p`);
+        }
+      });
+
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        if (data.fatal) {
+          console.warn('[HLS] Fatal error, falling back to direct URL');
+          hls.destroy();
+          video.src = src;
+        }
+      });
+
+      hlsRef.current = hls;
+
+      return () => {
+        hls.destroy();
+        hlsRef.current = null;
+      };
+    } else if (useHls && video.canPlayType('application/vnd.apple.mpegurl')) {
+      // Safari — native HLS support
+      video.src = streamUrl!;
+    } else {
+      // Fallback — direct MP4
+      video.src = src;
+    }
+
+    return undefined;
+  }, [src, streamUrl, useHls]);
 
   const togglePlay = async () => {
     const video = videoRef.current;
@@ -277,6 +354,18 @@ function DirectVideoPlayer({
     }
   }, []);
 
+  const setQualityLevel = (index: number) => {
+    if (hlsRef.current) {
+      hlsRef.current.currentLevel = index;
+      setQuality(
+        index === -1
+          ? 'Auto'
+          : availableQualities.find((q) => q.index === index)?.label || ''
+      );
+    }
+    setShowQuality(false);
+  };
+
   // Track time + fire callbacks
   useEffect(() => {
     const video = videoRef.current;
@@ -295,17 +384,29 @@ function DirectVideoPlayer({
       onEnded?.();
     };
     const onError = () => setError(true);
+    const onWaiting = () => setBuffering(true);
+    const onPlaying = () => {
+      setBuffering(false);
+      setPlaying(true);
+    };
+    const onPause = () => setPlaying(false);
 
     video.addEventListener('timeupdate', onTimeUpdate);
     video.addEventListener('loadedmetadata', onLoadedMetadata);
     video.addEventListener('ended', handleEnded);
     video.addEventListener('error', onError);
+    video.addEventListener('waiting', onWaiting);
+    video.addEventListener('playing', onPlaying);
+    video.addEventListener('pause', onPause);
 
     return () => {
       video.removeEventListener('timeupdate', onTimeUpdate);
       video.removeEventListener('loadedmetadata', onLoadedMetadata);
       video.removeEventListener('ended', handleEnded);
       video.removeEventListener('error', onError);
+      video.removeEventListener('waiting', onWaiting);
+      video.removeEventListener('playing', onPlaying);
+      video.removeEventListener('pause', onPause);
     };
   }, [duration, onProgress, onEnded]);
 
@@ -347,7 +448,6 @@ function DirectVideoPlayer({
       {/* Video */}
       <video
         ref={videoRef}
-        src={src}
         className="w-full cursor-pointer"
         onClick={togglePlay}
         playsInline
@@ -358,8 +458,22 @@ function DirectVideoPlayer({
         )}
       </video>
 
+      {/* Buffering spinner */}
+      {buffering && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/30 pointer-events-none">
+          <div className="w-10 h-10 border-[3px] border-white border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+
+      {/* Current quality badge */}
+      {currentBitrate && (
+        <div className="absolute top-3 right-3 bg-black/60 text-white text-xs px-2 py-1 rounded flex items-center gap-1 pointer-events-none">
+          <Wifi size={12} /> {currentBitrate}
+        </div>
+      )}
+
       {/* Play overlay (shown when paused) */}
-      {!playing && !error && (
+      {!playing && !error && !buffering && (
         <div
           className="absolute inset-0 flex items-center justify-center bg-black/30 cursor-pointer"
           onClick={togglePlay}
@@ -441,6 +555,51 @@ function DirectVideoPlayer({
           </div>
 
           <div className="flex items-center gap-md">
+            {/* Quality selector */}
+            {availableQualities.length > 0 && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowQuality(!showQuality)}
+                  className="text-white/80 transition-colors hover:text-white flex items-center gap-1 text-caption"
+                  aria-label="Video quality"
+                >
+                  <Settings className="h-4 w-4" /> {quality}
+                </button>
+                {showQuality && (
+                  <div className="absolute bottom-full right-0 mb-2 bg-black/90 rounded-md overflow-hidden min-w-[120px]">
+                    <button
+                      type="button"
+                      onClick={() => setQualityLevel(-1)}
+                      className={`w-full px-3 py-2 text-left text-caption hover:bg-white/10 ${
+                        quality === 'Auto'
+                          ? 'text-primary-main'
+                          : 'text-white'
+                      }`}
+                    >
+                      Auto (save data)
+                    </button>
+                    {availableQualities
+                      .sort((a, b) => a.height - b.height)
+                      .map((q) => (
+                        <button
+                          type="button"
+                          key={q.index}
+                          onClick={() => setQualityLevel(q.index)}
+                          className={`w-full px-3 py-2 text-left text-caption hover:bg-white/10 ${
+                            quality === q.label
+                              ? 'text-primary-main'
+                              : 'text-white'
+                          }`}
+                        >
+                          {q.label}
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Mute */}
             <button
               type="button"

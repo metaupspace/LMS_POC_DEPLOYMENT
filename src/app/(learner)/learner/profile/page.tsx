@@ -31,6 +31,12 @@ import {
   type GamificationData,
 } from '@/store/slices/api/gamificationApi';
 import { useChangePasswordMutation, useLogoutMutation } from '@/store/slices/api/authApi';
+import {
+  useGetCertificationsQuery,
+  useGetTestsQuery,
+  type CertificationData,
+  type TestData as TestDataType,
+} from '@/store/slices/api/testApi';
 import { Card, Badge, Button, Input, ConfirmDialog, LoadingSpinner } from '@/components/ui';
 import { LanguageSwitcher, HelpCenter } from '@/components/shared';
 
@@ -407,6 +413,99 @@ function ChangePasswordSection() {
   );
 }
 
+// ─── Certifications Section ─────────────────────────────
+
+function CertificationsSection() {
+  const router = useRouter();
+  const { data: certsResponse } = useGetCertificationsQuery();
+  const { data: testsResponse } = useGetTestsQuery();
+
+  const certifications = certsResponse?.data || [];
+  const tests = testsResponse?.data || [];
+
+  // Filter assigned tests that haven't been certified yet
+  const certifiedTestIds = new Set(
+    certifications.map((c) => {
+      const test = c.test;
+      if (typeof test === 'object' && test !== null) return (test as { _id: string })._id;
+      return test as string;
+    })
+  );
+  const availableTests = tests.filter(
+    (t) => !certifiedTestIds.has(t._id)
+  );
+
+  if (certifications.length === 0 && availableTests.length === 0) return null;
+
+  return (
+    <div className="space-y-md">
+      {/* Earned Certifications */}
+      {certifications.length > 0 && (
+        <Card>
+          <h2 className="text-h3 font-semibold mb-md flex items-center gap-sm">
+            <Award className="h-5 w-5 text-primary-main" /> My Certifications
+          </h2>
+          <div className="space-y-sm">
+            {certifications.map((cert) => (
+              <div
+                key={cert._id}
+                className="flex items-center gap-md rounded-md border border-success/30 bg-success/5 p-md"
+              >
+                <span className="text-2xl">{'\u{1F3C6}'}</span>
+                <div>
+                  <p className="text-body-md font-semibold text-primary-main">
+                    {cert.title}
+                  </p>
+                  <p className="text-caption text-text-secondary">
+                    Score: {cert.score}% — Earned:{' '}
+                    {new Date(cert.earnedAt).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Available Tests */}
+      {availableTests.length > 0 && (
+        <Card>
+          <h2 className="text-h3 font-semibold mb-md">Available Tests</h2>
+          <div className="space-y-sm">
+            {availableTests.map((test) => (
+              <div
+                key={test._id}
+                className="rounded-md border border-border-light p-md"
+              >
+                <h3 className="text-body-md font-medium">
+                  {test.title}
+                </h3>
+                <p className="text-caption text-text-secondary mt-xs">
+                  Pass to earn: &quot;{test.certificationTitle}&quot;
+                </p>
+                <p className="text-caption text-text-secondary">
+                  {test.questions?.length || 0} questions
+                  {test.timeLimitMinutes > 0
+                    ? ` — ${test.timeLimitMinutes} min`
+                    : ''}{' '}
+                  — {test.maxAttempts} attempt
+                  {test.maxAttempts > 1 ? 's' : ''}
+                </p>
+                <button
+                  onClick={() => router.push(`/learner/test/${test._id}`)}
+                  className="mt-sm px-md py-xs bg-primary-main text-white rounded-sm text-caption font-medium hover:bg-primary-hover transition-colors"
+                >
+                  Take Test
+                </button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Page Component ─────────────────────────────────
 
 export default function LearnerProfile() {
@@ -504,6 +603,9 @@ export default function LearnerProfile() {
 
       {/* ── Gamification Section ── */}
       {gamification && <GamificationSummary gamification={gamification} />}
+
+      {/* ── Certifications Section ── */}
+      <CertificationsSection />
 
       {/* ── Settings Section ── */}
       <div className="rounded-md bg-surface-white shadow-sm overflow-hidden">

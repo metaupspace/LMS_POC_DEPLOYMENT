@@ -9,6 +9,7 @@ import {
   Flame,
   Bell,
   BellOff,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Button, LoadingSpinner } from '@/components/ui';
 import {
@@ -32,6 +33,8 @@ const typeIcons: Record<NotificationType, React.ElementType> = {
   badge_earned: Award,
   streak: Flame,
   general: Bell,
+  test_assigned: ClipboardCheck,
+  certification_earned: Award,
 };
 
 const typeColors: Record<NotificationType, string> = {
@@ -44,6 +47,8 @@ const typeColors: Record<NotificationType, string> = {
   badge_earned: 'bg-purple-50 text-purple-600',
   streak: 'bg-orange-50 text-orange-600',
   general: 'bg-surface-background text-text-secondary',
+  test_assigned: 'bg-indigo-50 text-indigo-600',
+  certification_earned: 'bg-yellow-50 text-yellow-600',
 };
 
 // ─── Time Ago Helper ─────────────────────────────────────

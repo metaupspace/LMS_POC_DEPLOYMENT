@@ -53,7 +53,8 @@
     "assignCourse": "कोर्स असाइन करें",
     "addManager": "प्रबंधक जोड़ें",
     "addCoach": "कोच जोड़ें",
-    "addStaff": "स्टाफ जोड़ें"
+    "addStaff": "स्टाफ जोड़ें",
+    "createTest": "परीक्षा बनाएं"
   },
   "users": {
     "managers": "प्रबंधक",
@@ -239,6 +240,9 @@
     "trackProgressDesc": "स्ट्रीक बनाएं, बैज अनलॉक करें और लीडरबोर्ड पर अपनी उन्नति देखें।",
     "getStarted": "शुरू करें",
     "completeSetup": "सेटअप पूरा करें"
+  },
+  "tests": {
+    "tests": "परीक्षा"
   },
   "reports": {
     "reports": "रिपोर्ट",

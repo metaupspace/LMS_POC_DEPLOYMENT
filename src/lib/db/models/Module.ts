@@ -18,6 +18,14 @@ const moduleContentSchema = new Schema(
       type: String,
       required: true,
     },
+    hlsUrl: {
+      type: String,
+      default: null,
+    },
+    publicId: {
+      type: String,
+      default: null,
+    },
     duration: {
       type: Number,
       default: 0,

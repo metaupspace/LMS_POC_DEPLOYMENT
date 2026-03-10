@@ -12,6 +12,9 @@ import './models/LearnerProgress';
 import './models/ProofOfWork';
 import './models/Gamification';
 import './models/Notification';
+import './models/CertificationTest';
+import './models/TestAttempt';
+import './models/Certification';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 

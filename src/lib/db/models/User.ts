@@ -68,6 +68,10 @@ const userSchema = new Schema<IUser>(
       type: String,
       default: 'en',
     },
+    dataSaver: {
+      type: Boolean,
+      default: true,
+    },
     firstLogin: {
       type: Boolean,
       default: true,

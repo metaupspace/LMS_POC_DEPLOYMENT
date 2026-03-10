@@ -11,6 +11,9 @@ import type {
   ContentType,
   BadgeTier,
   NotificationType,
+  TestStatus,
+  TestAttemptStatus,
+  ViolationType,
 } from './enums';
 
 // ─── User ────────────────────────────────────────────────
@@ -28,6 +31,7 @@ export interface IUser extends Document {
   status: UserStatus;
   profileImage: string;
   preferredLanguage: string;
+  dataSaver: boolean;
   firstLogin: boolean;
   refreshToken: string;
   createdBy: Types.ObjectId;
@@ -43,6 +47,8 @@ export interface IModuleContent {
   type: ContentType;
   title: string;
   data: string;
+  hlsUrl?: string | null;
+  publicId?: string | null;
   duration: number;
   downloadable: boolean;
 }
@@ -226,6 +232,86 @@ export interface INotification extends Document {
   updatedAt: Date;
 }
 
+// ─── Certification Test ─────────────────────────────────
+
+export interface ITestOption {
+  text: string;
+  image: string;
+  isCorrect: boolean;
+}
+
+export interface ITestQuestion {
+  questionText: string;
+  questionImage: string;
+  options: ITestOption[];
+  points: number;
+}
+
+export interface ICertificationTest extends Document {
+  _id: Types.ObjectId;
+  title: string;
+  description: string;
+  domain: string;
+  certificationTitle: string;
+  questions: ITestQuestion[];
+  passingScore: number;
+  maxAttempts: number;
+  timeLimitMinutes: number;
+  shuffleQuestions: boolean;
+  shuffleOptions: boolean;
+  assignedStaff: Types.ObjectId[];
+  status: TestStatus;
+  createdBy: Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface IViolation {
+  type: ViolationType;
+  timestamp: Date;
+  details: string;
+}
+
+export interface ITestAnswer {
+  questionIndex: number;
+  selectedOption: number;
+}
+
+export interface ITestAttempt extends Document {
+  _id: Types.ObjectId;
+  user: Types.ObjectId;
+  test: Types.ObjectId;
+  answers: ITestAnswer[];
+  score: number;
+  correctCount: number;
+  totalQuestions: number;
+  passed: boolean;
+  pointsEarned: number;
+  totalPoints: number;
+  violations: IViolation[];
+  totalViolations: number;
+  startedAt: Date;
+  submittedAt: Date;
+  timeSpentSeconds: number;
+  wasOfflineSync: boolean;
+  status: TestAttemptStatus;
+  attemptNumber: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ICertification extends Document {
+  _id: Types.ObjectId;
+  user: Types.ObjectId;
+  test: Types.ObjectId;
+  title: string;
+  earnedAt: Date;
+  score: number;
+  attemptId: Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // ─── Re-exports ──────────────────────────────────────────
 
 export type {
@@ -239,6 +325,9 @@ export type {
   ContentType,
   BadgeTier,
   NotificationType,
+  TestStatus,
+  TestAttemptStatus,
+  ViolationType,
 } from './enums';
 
 export type {
