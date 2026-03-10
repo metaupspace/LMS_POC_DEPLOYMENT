@@ -129,6 +129,15 @@ function buildNotification(
           type,
           metadata: payload,
         };
+        case 'certification_earned':
+          return {
+            title: 'Certification Earned!',
+            message: payload.certificationTitle
+              ? `Congratulations! You earned the "${payload.certificationTitle}" certification with a score of ${payload.score}%.`
+              : 'Congratulations! You earned a new certification.',
+            type,
+            metadata: payload,
+          };
     default:
       return {
         title: payload.title ?? 'Notification',
