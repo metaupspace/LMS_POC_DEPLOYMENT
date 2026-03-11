@@ -61,7 +61,7 @@ const statusVariantMap: Record<string, BadgeVariant> = {
 
 /** Derive a display status based on current time vs session date+timeSlot+duration. */
 function getDisplayStatus(session: { status: string; date: string; timeSlot: string; duration?: number }): string {
-  if (session.status !== 'upcoming') return session.status;
+  if (session.status === 'cancelled') return 'cancelled';
 
   const sessionDate = new Date(session.date);
   const parts = (session.timeSlot ?? '').split(':');

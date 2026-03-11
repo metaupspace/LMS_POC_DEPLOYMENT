@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start -p ${PORT:-3000}",
+    "start": "TZ=Asia/Kolkata next start -p ${PORT:-3000}",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css}\"",

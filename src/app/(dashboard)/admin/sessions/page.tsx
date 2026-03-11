@@ -58,7 +58,7 @@ function formatDate(dateStr: string): string {
 
 /** Derive a display status based on current time vs session date+timeSlot+duration. */
 function getDisplayStatus(session: SessionData): string {
-  if (session.status !== 'upcoming') return session.status;
+  if (session.status === 'cancelled') return 'cancelled';
 
   const sessionDate = new Date(session.date);
   const parts = (session.timeSlot ?? '').split(':');
@@ -346,8 +346,8 @@ interface SessionCardProps {
 }
 
 function SessionCard({ session, onClick }: SessionCardProps) {
-  const displayStatus = getDisplayStatus(session);
-  const statusVariant = statusVariantMap[displayStatus] ?? 'default';
+  // const displayStatus = getDisplayStatus(session);
+  const statusVariant = statusVariantMap[session.status] ?? 'default';
 
   return (
     <Card
@@ -403,7 +403,8 @@ function SessionCard({ session, onClick }: SessionCardProps) {
             {session.instructor ? `Instructor assigned` : 'No instructor'}
           </span>
           <Badge variant={statusVariant}>
-            {displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
+            {/* {displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)} */}
+            {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
           </Badge>
         </div>
       </div>
