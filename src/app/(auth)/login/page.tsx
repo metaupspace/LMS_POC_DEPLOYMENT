@@ -44,6 +44,9 @@ export default function LoginPage() {
       if (result.success && result.data) {
         const { accessToken, refreshToken, user } = result.data;
 
+        // Clear any stale cached data from a previous user's session
+        dispatch(baseApi.util.resetApiState());
+
         dispatch(
           setCredentials({
             user: {

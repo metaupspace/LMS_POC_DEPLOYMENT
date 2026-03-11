@@ -36,6 +36,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 
     if (!refreshToken) {
       api.dispatch(logout());
+      api.dispatch(baseApi.util.resetApiState());
       return result;
     }
 
@@ -79,9 +80,11 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
         }
 
         api.dispatch(logout());
+        api.dispatch(baseApi.util.resetApiState());
         return false;
       } catch {
         api.dispatch(logout());
+        api.dispatch(baseApi.util.resetApiState());
         return false;
       } finally {
         isRefreshing = false;

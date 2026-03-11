@@ -6,6 +6,7 @@ import { User, KeyRound, LogOut } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { logout } from '@/store/slices/authSlice';
 import { useLogoutMutation } from '@/store/slices/api/authApi';
+import { baseApi } from '@/store/slices/api/baseApi';
 
 export default function ProfileDropdown() {
   const [open, setOpen] = useState(false);
@@ -39,6 +40,7 @@ export default function ProfileDropdown() {
       // Logout even if API fails
     }
     dispatch(logout());
+    dispatch(baseApi.util.resetApiState());
     router.push('/login');
   };
 

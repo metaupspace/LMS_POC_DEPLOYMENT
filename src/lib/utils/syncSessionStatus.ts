@@ -1,4 +1,10 @@
 import TrainingSession from '@/lib/db/models/TrainingSession';
+import { redisGet, redisSet, redisDel } from '@/lib/redis/client';
+import type { SessionStatus } from '@/types/enums';
+
+const LOCK_KEY = 'cron:session-sync:lock';
+const LOCK_TTL = 55; // seconds — less than 60s interval to prevent overlap
+const LAST_RUN_KEY = 'cron:session-sync:last-run';
 
 /**
  * Compute the correct status for a session based on current time.
@@ -32,26 +38,81 @@ export function computeSessionStatus(session: {
 
 /**
  * Bulk sync: update all sessions whose stored status is stale.
- * Only checks non-terminal statuses (upcoming, ongoing).
+ * Uses a Redis distributed lock to prevent duplicate execution across instances.
+ * Falls back to lockless execution if Redis is unavailable.
  */
-export async function syncAllSessionStatuses(): Promise<number> {
-  const sessions = await TrainingSession.find({
-    status: { $in: ['upcoming', 'ongoing'] },
-  })
-    .select('date timeSlot duration status')
-    .lean();
+export async function syncAllSessionStatuses(): Promise<{
+  updated: number;
+  checked: number;
+  skipped: boolean;
+}> {
+  let lockAcquired = false;
 
-  let updatedCount = 0;
-
-  for (const session of sessions) {
-    const computed = computeSessionStatus(session);
-    if (session.status !== computed) {
-      await TrainingSession.findByIdAndUpdate(session._id, { status: computed });
-      updatedCount++;
+  try {
+    // Attempt distributed lock — prevents duplicate execution across instances
+    const existingLock = await redisGet<string>(LOCK_KEY);
+    if (existingLock) {
+      return { updated: 0, checked: 0, skipped: true };
     }
+    await redisSet(LOCK_KEY, `running:${Date.now()}`, LOCK_TTL);
+    lockAcquired = true;
+  } catch {
+    // Redis unavailable — proceed without lock (single-instance fallback)
   }
 
-  return updatedCount;
+  try {
+    const sessions = await TrainingSession.find({
+      status: { $in: ['upcoming', 'ongoing'] },
+    })
+      .select('date timeSlot duration status')
+      .lean();
+
+    let updated = 0;
+    const bulkOps: {
+      updateOne: { filter: { _id: unknown }; update: { $set: { status: SessionStatus } } };
+    }[] = [];
+
+    for (const session of sessions) {
+      const computed = computeSessionStatus(session);
+      if (session.status !== computed) {
+        bulkOps.push({
+          updateOne: {
+            filter: { _id: session._id },
+            update: { $set: { status: computed } },
+          },
+        });
+        updated++;
+      }
+    }
+
+    // Bulk update — single DB call instead of N calls
+    if (bulkOps.length > 0) {
+      await TrainingSession.bulkWrite(bulkOps);
+    }
+
+    // Track last successful run in Redis
+    try {
+      await redisSet(
+        LAST_RUN_KEY,
+        { timestamp: new Date().toISOString(), checked: sessions.length, updated },
+        3600
+      );
+    } catch {
+      // Non-critical — skip if Redis unavailable
+    }
+
+    return { updated, checked: sessions.length, skipped: false };
+  } catch (err) {
+    // Release lock on error so next run can retry
+    if (lockAcquired) {
+      try {
+        await redisDel(LOCK_KEY);
+      } catch {
+        // Lock will auto-expire via TTL
+      }
+    }
+    throw err;
+  }
 }
 
 /**
