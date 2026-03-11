@@ -15,7 +15,12 @@
       "Bash(node:*)",
       "Bash(npm ls:*)",
       "Bash(sips:*)",
-      "Bash(npm:*)"
+      "Bash(npm:*)",
+      "Bash(grep -n \"content\\\\.type\\\\|VideoPlayer\\\\|render\\\\|switch\" /Users/CTO/Downloads/LMS-PSIPL/lms-platform/src/app/\\\\\\(learner\\\\\\)/learner/learning/module/\\\\[id\\\\]/page.tsx | head -50)",
+      "Bash(grep -n \"auto.*complete\\\\|setTimeout\\\\|completeContent\\\\|setCompletedContents\\\\|mark.*read\" /Users/CTO/Downloads/LMS-PSIPL/lms-platform/src/app/\\\\\\(learner\\\\\\)/learner/learning/module/\\\\[id\\\\]/page.tsx)",
+      "Bash(grep -n \"useEffect\\\\|completedContents\" /Users/CTO/Downloads/LMS-PSIPL/lms-platform/src/app/\\\\\\(learner\\\\\\)/learner/learning/module/\\\\[id\\\\]/page.tsx | head -20)",
+      "Bash(grep -n \"animate\\\\|keyframes\\\\|spin\" /Users/CTO/Downloads/LMS-PSIPL/lms-platform/src/app/\\\\\\(learner\\\\\\)/learner/learning/module/\\\\[id\\\\]/page.tsx)",
+      "Bash(grep -n \"phase === \\\\|ViewPhase\\\\|'content'\" /Users/CTO/Downloads/LMS-PSIPL/lms-platform/src/app/\\\\\\(learner\\\\\\)/learner/learning/module/\\\\[id\\\\]/page.tsx | head -30)"
     ]
   }
 }

@@ -23,6 +23,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { VideoPlayer, Card, Button, FileUpload } from '@/components/ui';
+import TextContentViewer from '@/components/learner/TextContentViewer';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 import {
@@ -202,63 +203,7 @@ function VideoContentView({ content, onComplete, isCompleted }: VideoContentView
   );
 }
 
-// ─── Text Content View ──────────────────────────────────────
-
-interface TextContentViewProps {
-  content: ModuleContentData;
-  onComplete: () => void;
-  isCompleted: boolean;
-}
-
-function TextContentView({ content, onComplete, isCompleted }: TextContentViewProps) {
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const completedRef = useRef(isCompleted);
-
-  useEffect(() => {
-    completedRef.current = isCompleted;
-  }, [isCompleted]);
-
-  // IntersectionObserver on the sentinel div at bottom
-  useEffect(() => {
-    if (isCompleted) return;
-
-    const sentinel = sentinelRef.current;
-    if (!sentinel) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting && !completedRef.current) {
-            completedRef.current = true;
-            onComplete();
-          }
-        }
-      },
-      { threshold: 1.0 }
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [isCompleted, onComplete]);
-
-  return (
-    <div className="space-y-md">
-      <h2 className="text-h3 font-semibold text-text-primary">
-        {content.title}
-      </h2>
-
-      <div className="rounded-md bg-surface-white p-lg shadow-sm">
-        <div
-          className="prose prose-sm max-w-none text-body-md text-text-primary leading-relaxed whitespace-pre-wrap"
-        >
-          {content.data}
-        </div>
-        {/* Sentinel for scroll completion detection */}
-        <div ref={sentinelRef} className="h-[1px]" />
-      </div>
-    </div>
-  );
-}
+// ─── Text Content View (using TextContentViewer component) ──
 
 // ─── Quiz Option Card ───────────────────────────────────────
 
@@ -1638,10 +1583,10 @@ export default function ModuleContentViewer() {
                   isCompleted={isCurrentContentCompleted}
                 />
               ) : (
-                <TextContentView
+                <TextContentViewer
                   content={currentContent}
-                  onComplete={() => handleContentComplete(currentContentIndex)}
                   isCompleted={isCurrentContentCompleted}
+                  onComplete={() => handleContentComplete(currentContentIndex)}
                 />
               )}
             </>
