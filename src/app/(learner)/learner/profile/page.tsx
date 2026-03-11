@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { logout } from '@/store/slices/authSlice';
+import { baseApi } from '@/store/slices/api/baseApi';
 import { addToast, openModal, closeModal } from '@/store/slices/uiSlice';
 import { useGetUserByIdQuery } from '@/store/slices/api/userApi';
 import {
@@ -537,6 +538,7 @@ export default function LearnerProfile() {
     }
     dispatch(closeModal());
     dispatch(logout());
+    dispatch(baseApi.util.resetApiState());
     router.push('/login');
   }, [logoutMutation, dispatch, router]);
 

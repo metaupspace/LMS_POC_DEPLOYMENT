@@ -16,5 +16,17 @@ export async function register() {
         err instanceof Error ? err.message : err
       );
     }
+
+    // Start cron jobs (session status sync, etc.)
+    try {
+      const { startCronJobs } = await import('@/lib/cron/index');
+      startCronJobs();
+      console.info('[Instrumentation] Cron jobs started');
+    } catch (err) {
+      console.error(
+        '[Instrumentation] Failed to start cron jobs:',
+        err instanceof Error ? err.message : err
+      );
+    }
   }
 }

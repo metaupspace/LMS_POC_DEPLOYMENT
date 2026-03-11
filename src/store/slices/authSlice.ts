@@ -68,6 +68,13 @@ const clearStorage = () => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
+    // Clear any other app-specific cached data
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith('lms_') || key.startsWith('persist:')) {
+        localStorage.removeItem(key);
+      }
+    });
+    sessionStorage.clear();
   } catch {
     // Storage unavailable
   }
