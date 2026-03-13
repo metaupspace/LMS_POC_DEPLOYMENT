@@ -11,6 +11,7 @@ import { publishToQueue } from '@/lib/rabbitmq/producer';
 import { QUEUE_NAMES } from '@/lib/rabbitmq/connection';
 import { POINTS, BADGE_TIERS } from '@/lib/constants';
 import { updateStreak } from '@/lib/utils/updateStreak';
+import { redisDel } from '@/lib/redis/client';
 
 // POST /api/quizzes/[id]/attempt
 export const POST = withAuth(
@@ -169,6 +170,13 @@ export const POST = withAuth(
       }
 
       await progress.save();
+
+      // Invalidate caches after quiz attempt
+      const courseId = progress.course?.toString() ?? moduleDoc.course?.toString();
+      await Promise.all([
+        redisDel(`gamification:${currentUserId}`),
+        courseId ? redisDel(`course-analytics:${courseId}`) : Promise.resolve(),
+      ]).catch(() => {});
 
       // Update daily streak on every quiz attempt
       await updateStreak(currentUserId);

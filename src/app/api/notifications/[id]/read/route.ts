@@ -3,6 +3,7 @@ import { connectDB } from '@/lib/db/connect';
 import Notification from '@/lib/db/models/Notification';
 import { withAuth } from '@/lib/auth/rbac';
 import { successResponse, errorResponse } from '@/lib/utils/apiResponse';
+import { redisDel } from '@/lib/redis/client';
 
 // POST /api/notifications/[id]/read
 export const POST = withAuth(
@@ -24,6 +25,9 @@ export const POST = withAuth(
 
       notification.read = true;
       await notification.save();
+
+      // Invalidate unread count cache
+      await redisDel(`notifications:unread:${currentUserId}`).catch(() => {});
 
       return successResponse(null, 'Notification marked as read');
     } catch (err) {

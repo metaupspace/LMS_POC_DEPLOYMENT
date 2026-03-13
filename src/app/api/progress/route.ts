@@ -9,6 +9,7 @@ import { successResponse, errorResponse, paginatedResponse } from '@/lib/utils/a
 import { getPaginationParams, buildPaginationMeta } from '@/lib/utils/pagination';
 import { POINTS, BADGE_TIERS } from '@/lib/constants';
 import { updateStreak } from '@/lib/utils/updateStreak';
+import { redisDel } from '@/lib/redis/client';
 import type { FilterQuery } from 'mongoose';
 import type { ILearnerProgress } from '@/types';
 import { z } from 'zod';
@@ -251,6 +252,13 @@ export const PATCH = withAuth(
         (progress.videoPoints || 0) + (progress.quizPoints || 0) + (progress.proofOfWorkPoints || 0);
 
       await progress.save();
+
+      // Invalidate caches after progress update
+      const courseId = progress.course?.toString();
+      await Promise.all([
+        redisDel(`gamification:${currentUserId}`),
+        courseId ? redisDel(`course-analytics:${courseId}`) : Promise.resolve(),
+      ]).catch(() => {});
 
       // Update daily streak on every content activity
       await updateStreak(currentUserId);
