@@ -23,7 +23,7 @@ import {
   Award,
 } from 'lucide-react';
 import { Card, Badge, Button } from '@/components/ui';
-import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import { useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 import {
   useMarkAttendanceMutation,

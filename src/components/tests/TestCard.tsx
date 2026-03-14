@@ -20,7 +20,7 @@ interface TestCardProps {
   status: string;
   onClick: () => void;
   onEdit?: () => void;
-  onDelete?: (e: React.MouseEvent) => void;
+  onDelete?: (_e: React.MouseEvent) => void;
 }
 
 export default function TestCard({

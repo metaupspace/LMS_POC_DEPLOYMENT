@@ -14,7 +14,7 @@ interface ModuleItem {
 
 interface CourseModuleListProps {
   modules: ModuleItem[];
-  onModuleClick?: (moduleId: string) => void;
+  onModuleClick?: (_moduleId: string) => void;
   defaultExpanded?: boolean;
   className?: string;
 }

@@ -1,4 +1,4 @@
-import { CheckCircle, Clock, AlertCircle, Ban, Flame, Play } from 'lucide-react';
+import { CheckCircle, Clock, AlertCircle, Ban, Play } from 'lucide-react';
 
 type StatusType =
   | 'completed' | 'ongoing' | 'upcoming' | 'cancelled'

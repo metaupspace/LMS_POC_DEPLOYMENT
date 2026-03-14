@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useAppSelector } from '@/store/hooks';
 import {
   useGetSessionsQuery,

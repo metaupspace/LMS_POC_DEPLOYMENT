@@ -18,7 +18,7 @@ interface TestQuestion {
 
 interface TestQuestionBuilderProps {
   questions: TestQuestion[];
-  onChange: (questions: TestQuestion[]) => void;
+  onChange: (_questions: TestQuestion[]) => void;
   className?: string;
 }
 

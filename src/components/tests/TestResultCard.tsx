@@ -19,7 +19,7 @@ export default function TestResultCard({
   passingScore,
   certificationTitle,
   attemptsRemaining,
-  maxAttempts,
+  // maxAttempts,
   totalViolations = 0,
   onBack,
 }: TestResultCardProps) {

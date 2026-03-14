@@ -30,7 +30,7 @@ import { useLearnerHomeData } from '@/hooks/useLearnerHomeData';
 
 function SessionAttendanceCard({ session, userId }: { session: SessionData; userId: string }) {
   const dispatch = useAppDispatch();
-  const router = useRouter();
+  // const router = useRouter();
   const [attendanceCode, setAttendanceCode] = useState('');
   const [markAttendance, { isLoading: isMarking }] = useMarkAttendanceMutation();
 

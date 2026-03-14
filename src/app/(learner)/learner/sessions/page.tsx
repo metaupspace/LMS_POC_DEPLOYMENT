@@ -19,7 +19,7 @@ import {
   useMarkAttendanceMutation,
   type SessionData,
 } from '@/store/slices/api/sessionApi';
-import { getDisplayStatus } from '@/hooks/useSessionStatus';
+// import { getDisplayStatus } from '@/hooks/useSessionStatus';
 import { SessionCardSkeleton, SessionCompactSkeleton } from '@/components/skeletons';
 import {
   useLearnerSessionsData,
