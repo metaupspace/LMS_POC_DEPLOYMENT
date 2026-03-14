@@ -22,6 +22,10 @@ const spec = {
     { name: 'Upload', description: 'File upload to Cloudinary' },
     { name: 'Reports', description: 'PDF and Excel report generation' },
     { name: 'Dashboard', description: 'Dashboard statistics' },
+    { name: 'Tests', description: 'Certification test management, attempts, and proctoring' },
+    { name: 'Certifications', description: 'User certification records' },
+    { name: 'Admin', description: 'Admin utilities — activity feed, cron health, repair tools' },
+    { name: 'Utilities', description: 'Health check, PDF proxy, seed scripts' },
   ],
   components: {
     securitySchemes: {
@@ -243,6 +247,108 @@ const spec = {
           type: { type: 'string', enum: ['assignment', 'session_reminder', 'proof_update', 'badge_earned', 'streak', 'general'] },
           read: { type: 'boolean' },
           metadata: { type: 'object' },
+          createdAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      CertificationTest: {
+        type: 'object',
+        properties: {
+          _id: { type: 'string' },
+          title: { type: 'string' },
+          description: { type: 'string' },
+          domain: { type: 'string' },
+          certificationTitle: { type: 'string' },
+          questions: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                questionText: { type: 'string' },
+                questionImage: { type: 'string', nullable: true },
+                options: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      text: { type: 'string' },
+                      image: { type: 'string', nullable: true },
+                      isCorrect: { type: 'boolean' },
+                    },
+                  },
+                },
+                points: { type: 'integer', default: 1 },
+              },
+            },
+          },
+          passingScore: { type: 'integer' },
+          maxAttempts: { type: 'integer' },
+          timeLimitMinutes: { type: 'integer' },
+          shuffleQuestions: { type: 'boolean' },
+          shuffleOptions: { type: 'boolean' },
+          status: { type: 'string', enum: ['draft', 'active', 'archived'] },
+          assignedStaff: { type: 'array', items: { type: 'string' } },
+          createdBy: { type: 'string' },
+          createdAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      TestAttempt: {
+        type: 'object',
+        properties: {
+          _id: { type: 'string' },
+          user: { type: 'string' },
+          test: { type: 'string' },
+          score: { type: 'integer' },
+          passed: { type: 'boolean' },
+          correctCount: { type: 'integer' },
+          totalQuestions: { type: 'integer' },
+          violations: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                type: { type: 'string', enum: ['tab_switch', 'minimize', 'copy_paste', 'screenshot', 'devtools'] },
+                timestamp: { type: 'string', format: 'date-time' },
+                details: { type: 'string' },
+              },
+            },
+          },
+          totalViolations: { type: 'integer' },
+          startedAt: { type: 'string', format: 'date-time' },
+          submittedAt: { type: 'string', format: 'date-time' },
+          timeSpentSeconds: { type: 'integer' },
+          wasOfflineSync: { type: 'boolean' },
+          status: { type: 'string', enum: ['in_progress', 'submitted', 'graded', 'expired'] },
+          attemptNumber: { type: 'integer' },
+          createdAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      Certification: {
+        type: 'object',
+        properties: {
+          _id: { type: 'string' },
+          user: { type: 'string' },
+          test: { type: 'string' },
+          title: { type: 'string' },
+          score: { type: 'integer' },
+          earnedAt: { type: 'string', format: 'date-time' },
+          attemptId: { type: 'string' },
+          createdAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      ProofOfWork: {
+        type: 'object',
+        properties: {
+          _id: { type: 'string' },
+          user: { type: 'string' },
+          course: { type: 'string' },
+          fileUrl: { type: 'string' },
+          fileType: { type: 'string' },
+          fileSize: { type: 'integer' },
+          status: { type: 'string', enum: ['submitted', 'approved', 'redo_requested'] },
+          reviewedBy: { type: 'string' },
+          reviewNote: { type: 'string' },
+          submittedAt: { type: 'string', format: 'date-time' },
+          reviewedAt: { type: 'string', format: 'date-time' },
           createdAt: { type: 'string', format: 'date-time' },
         },
       },
@@ -847,6 +953,344 @@ const spec = {
         summary: 'Get Dashboard Statistics',
         description: 'Returns counts for active courses, upcoming sessions, staff, coaches, managers. Cached in Redis (5 min TTL).',
         responses: { 200: { description: 'Dashboard stat counts' } },
+      },
+    },
+
+    // ─── Certification Tests ────────────────────────────────
+    '/tests': {
+      get: {
+        tags: ['Tests'],
+        summary: 'List Certification Tests',
+        description: 'Admin/Manager sees all tests. Staff sees only assigned active tests with attempt and certification status.',
+        parameters: [
+          { $ref: '#/components/parameters/PageParam' },
+          { $ref: '#/components/parameters/LimitParam' },
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['draft', 'active', 'archived'] } },
+          { name: 'includeCompleted', in: 'query', description: 'Staff only: include certified/exhausted tests', schema: { type: 'string', enum: ['true', 'false'] } },
+        ],
+        responses: {
+          200: {
+            description: 'List of tests',
+            content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean' }, data: { type: 'object', properties: { tests: { type: 'array', items: { $ref: '#/components/schemas/CertificationTest' } }, total: { type: 'integer' } } } } } } },
+          },
+        },
+      },
+      post: {
+        tags: ['Tests'],
+        summary: 'Create Certification Test',
+        description: 'Admin/Manager only. Creates a new certification test with questions.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['title', 'certificationTitle', 'questions', 'passingScore'],
+                properties: {
+                  title: { type: 'string', example: 'Electrician Level 1' },
+                  description: { type: 'string' },
+                  domain: { type: 'string', example: 'Electrical' },
+                  certificationTitle: { type: 'string', example: 'Experienced Electrician - 1' },
+                  passingScore: { type: 'integer', example: 70 },
+                  maxAttempts: { type: 'integer', default: 1 },
+                  timeLimitMinutes: { type: 'integer', default: 60 },
+                  shuffleQuestions: { type: 'boolean', default: true },
+                  shuffleOptions: { type: 'boolean', default: false },
+                  status: { type: 'string', enum: ['draft', 'active'], default: 'draft' },
+                  questions: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        questionText: { type: 'string' },
+                        questionImage: { type: 'string', nullable: true },
+                        options: { type: 'array', items: { type: 'object', properties: { text: { type: 'string' }, image: { type: 'string', nullable: true }, isCorrect: { type: 'boolean' } } } },
+                        points: { type: 'integer', default: 1 },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: { 201: { description: 'Test created' }, 400: { $ref: '#/components/responses/ValidationError' } },
+      },
+    },
+    '/tests/{id}': {
+      get: {
+        tags: ['Tests'],
+        summary: 'Get Test by ID',
+        description: 'Returns test details. Staff gets sanitized version (no isCorrect). Includes myAttempts and myCertification for staff.',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'Test details' }, 404: { $ref: '#/components/responses/NotFound' } },
+      },
+      patch: {
+        tags: ['Tests'],
+        summary: 'Update Test',
+        description: 'Admin/Manager only.',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          content: { 'application/json': { schema: { type: 'object', properties: { title: { type: 'string' }, description: { type: 'string' }, status: { type: 'string', enum: ['draft', 'active', 'archived'] }, passingScore: { type: 'integer' }, maxAttempts: { type: 'integer' }, timeLimitMinutes: { type: 'integer' }, questions: { type: 'array' } } } } },
+        },
+        responses: { 200: { description: 'Test updated' } },
+      },
+      delete: {
+        tags: ['Tests'],
+        summary: 'Delete Test',
+        description: 'Admin/Manager only. Also deletes all associated attempts and certifications.',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'Test deleted with all attempts and certifications' } },
+      },
+    },
+    '/tests/{id}/assign': {
+      post: {
+        tags: ['Tests'],
+        summary: 'Assign Staff to Test',
+        description: 'Admin/Manager only. Notifies newly assigned staff.',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', required: ['staffIds'], properties: { staffIds: { type: 'array', items: { type: 'string' }, example: ['userId1', 'userId2'] } } } } },
+        },
+        responses: { 200: { description: 'Staff assigned and notified' } },
+      },
+    },
+    '/tests/{id}/start': {
+      post: {
+        tags: ['Tests'],
+        summary: 'Start Test Attempt',
+        description: 'Staff only. Returns questions (without isCorrect) and creates an in-progress attempt. Resumes if an existing attempt is in progress.',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          200: {
+            description: 'Test started or resumed',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean' },
+                    data: {
+                      type: 'object',
+                      properties: {
+                        attemptId: { type: 'string' },
+                        questions: { type: 'array' },
+                        timeLimitMinutes: { type: 'integer' },
+                        startedAt: { type: 'string', format: 'date-time' },
+                        resuming: { type: 'boolean' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          400: { description: 'No attempts remaining or already certified' },
+        },
+      },
+    },
+    '/tests/{id}/submit': {
+      post: {
+        tags: ['Tests'],
+        summary: 'Submit Test Answers',
+        description: 'Staff only. Auto-grades the test, awards certification if passed, records proctoring violations.',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['attemptId', 'answers'],
+                properties: {
+                  attemptId: { type: 'string' },
+                  answers: { type: 'array', items: { type: 'object', properties: { questionIndex: { type: 'integer' }, selectedOption: { type: 'integer' } } } },
+                  violations: { type: 'array', items: { type: 'object', properties: { type: { type: 'string', enum: ['tab_switch', 'minimize', 'copy_paste', 'screenshot', 'devtools'] }, timestamp: { type: 'string', format: 'date-time' }, details: { type: 'string' } } } },
+                  timeSpentSeconds: { type: 'integer' },
+                  wasOfflineSync: { type: 'boolean' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Test graded',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean' },
+                    data: {
+                      type: 'object',
+                      properties: {
+                        score: { type: 'integer' },
+                        passed: { type: 'boolean' },
+                        correctCount: { type: 'integer' },
+                        totalQuestions: { type: 'integer' },
+                        certification: { type: 'object', nullable: true },
+                        attemptsRemaining: { type: 'integer' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/tests/{id}/violation': {
+      post: {
+        tags: ['Tests'],
+        summary: 'Report Proctoring Violation',
+        description: 'Staff only. Records a proctoring violation (tab switch, copy/paste, etc.) during an active test attempt.',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', required: ['attemptId', 'type'], properties: { attemptId: { type: 'string' }, type: { type: 'string', enum: ['tab_switch', 'minimize', 'copy_paste', 'screenshot', 'devtools'] }, details: { type: 'string' } } } } },
+        },
+        responses: { 200: { description: 'Violation recorded' } },
+      },
+    },
+
+    // ─── Certifications ─────────────────────────────────────
+    '/certifications': {
+      get: {
+        tags: ['Certifications'],
+        summary: 'Get User Certifications',
+        description: 'Staff sees their own. Admin/Manager/Coach can see any user\'s certifications by passing userId.',
+        parameters: [
+          { name: 'userId', in: 'query', description: 'User ID (admin/manager/coach can view others)', schema: { type: 'string' } },
+        ],
+        responses: {
+          200: {
+            description: 'List of certifications',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean' },
+                    data: { type: 'array', items: { $ref: '#/components/schemas/Certification' } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+
+    // ─── Admin Utilities ────────────────────────────────────
+    '/admin/recent-activities': {
+      get: {
+        tags: ['Admin'],
+        summary: 'Get Recent Platform Activity',
+        description: 'Admin/Manager. Aggregates recent events from all collections (progress, tests, certifications, proofs, attendance, new users) into a unified timeline.',
+        parameters: [
+          { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: 5 } },
+        ],
+        responses: {
+          200: {
+            description: 'Paginated activity feed sorted newest first',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean' },
+                    data: {
+                      type: 'object',
+                      properties: {
+                        activities: {
+                          type: 'array',
+                          items: {
+                            type: 'object',
+                            properties: {
+                              type: { type: 'string', enum: ['module_completed', 'test_passed', 'test_failed', 'certification_earned', 'proof_submitted', 'proof_approved', 'proof_redo_requested', 'attendance_marked', 'user_created'] },
+                              icon: { type: 'string' },
+                              user: { type: 'object', properties: { name: { type: 'string' }, empId: { type: 'string' } } },
+                              message: { type: 'string' },
+                              timestamp: { type: 'string', format: 'date-time' },
+                              metadata: { type: 'object' },
+                            },
+                          },
+                        },
+                        pagination: { type: 'object', properties: { page: { type: 'integer' }, limit: { type: 'integer' }, total: { type: 'integer' }, hasMore: { type: 'boolean' }, totalPages: { type: 'integer' } } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/admin/cron-status': {
+      get: {
+        tags: ['Admin'],
+        summary: 'Check Cron Job Health',
+        description: 'Admin only. Shows last run time and health status of the session sync cron job.',
+        responses: { 200: { description: 'Cron status with last run time and health' } },
+      },
+    },
+    '/admin/repair-proofs': {
+      get: {
+        tags: ['Admin'],
+        summary: 'Find and Repair Broken PDF Proofs',
+        description: 'Admin only. Scans all PDF proofs for 0-byte files and resets broken ones to redo_requested for re-upload.',
+        responses: { 200: { description: 'Repair report with count of fixed records' } },
+      },
+    },
+
+    // ─── Utilities ──────────────────────────────────────────
+    '/health': {
+      get: {
+        tags: ['Utilities'],
+        summary: 'Health Check',
+        description: 'Returns server status. No auth required.',
+        security: [],
+        responses: {
+          200: {
+            description: 'Server is running',
+            content: { 'application/json': { schema: { type: 'object', properties: { status: { type: 'string', example: 'ok' }, timestamp: { type: 'string', format: 'date-time' } } } } },
+          },
+        },
+      },
+    },
+    '/proxy-pdf': {
+      get: {
+        tags: ['Utilities'],
+        summary: 'Proxy PDF from Cloudinary',
+        description: 'Fetches a PDF from Cloudinary to bypass CORS restrictions. Only allows Cloudinary URLs.',
+        parameters: [{ name: 'url', in: 'query', required: true, schema: { type: 'string' }, description: 'Cloudinary PDF URL' }],
+        responses: {
+          200: { description: 'PDF file stream', content: { 'application/pdf': {} } },
+          403: { description: 'Non-Cloudinary URL rejected' },
+        },
+      },
+    },
+    '/seed/users': {
+      get: {
+        tags: ['Utilities'],
+        summary: 'Seed Admin User',
+        description: 'Development utility. Creates default admin user if not exists. No auth required.',
+        security: [],
+        responses: { 200: { description: 'Admin user seeded or already exists' } },
+      },
+    },
+    '/seed/users/delete': {
+      delete: {
+        tags: ['Utilities'],
+        summary: 'Delete All Seeded Data',
+        description: 'Development utility. Removes all seeded users. No auth required.',
+        security: [],
+        responses: { 200: { description: 'Seeded data deleted' } },
       },
     },
   },
