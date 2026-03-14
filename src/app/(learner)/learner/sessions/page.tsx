@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import Image from 'next/image';
 import {
   CalendarDays,
@@ -13,58 +13,21 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { Card, Badge, Button } from '@/components/ui';
-import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import { useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 import {
-  useGetSessionsQuery,
   useMarkAttendanceMutation,
   type SessionData,
 } from '@/store/slices/api/sessionApi';
+import { getDisplayStatus } from '@/hooks/useSessionStatus';
+import { SessionCardSkeleton, SessionCompactSkeleton } from '@/components/skeletons';
+import {
+  useLearnerSessionsData,
+  formatDate,
+  getStaffId,
+} from '@/hooks/useLearnerSessionsData';
 
-// ─── Helpers ──────────────────────────────────────────────
-
-function isSameDay(dateStr: string, reference: Date): boolean {
-  const d = new Date(dateStr);
-  return (
-    d.getFullYear() === reference.getFullYear() &&
-    d.getMonth() === reference.getMonth() &&
-    d.getDate() === reference.getDate()
-  );
-}
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
-function getStaffId(staff: string | { _id: string }): string {
-  return typeof staff === 'string' ? staff : staff._id;
-}
-
-/** Derive display status based on current time vs session date+timeSlot+duration. */
-function getDisplayStatus(session: SessionData): 'upcoming' | 'ongoing' | 'completed' | 'cancelled' {
-  if (session.status === 'cancelled') return 'cancelled';
-  if (session.status === 'completed') return 'completed';
-
-  const sessionDate = new Date(session.date);
-  const parts = (session.timeSlot ?? '').split(':').map(Number);
-  const hours = parts[0];
-  const minutes = parts[1];
-  if (hours !== undefined && minutes !== undefined && !isNaN(hours) && !isNaN(minutes)) {
-    sessionDate.setHours(hours, minutes, 0, 0);
-  }
-
-  const now = Date.now();
-  const startTime = sessionDate.getTime();
-  const endTime = startTime + (session.duration ?? 0) * 60 * 1000;
-
-  if (now >= endTime) return 'completed';
-  if (now >= startTime) return 'ongoing';
-  return 'upcoming';
-}
+// ─── Status Badge Variant Map ─────────────────────────────
 
 type StatusBadgeVariant = 'warning' | 'info' | 'success' | 'error' | 'default';
 
@@ -74,41 +37,6 @@ const statusVariantMap: Record<string, StatusBadgeVariant> = {
   completed: 'success',
   cancelled: 'error',
 };
-
-// ─── Filter Types ─────────────────────────────────────────
-
-type AttendanceFilter = 'all' | 'attended' | 'not_attended';
-
-// ─── Skeleton Components ──────────────────────────────────
-
-function SessionCardSkeleton() {
-  return (
-    <div className="rounded-md bg-surface-white shadow-sm overflow-hidden animate-pulse">
-      <div className="h-[140px] w-full bg-border-light" />
-      <div className="p-lg space-y-md">
-        <div className="h-5 w-3/4 rounded-sm bg-border-light" />
-        <div className="h-4 w-full rounded-sm bg-border-light" />
-        <div className="h-4 w-1/2 rounded-sm bg-border-light" />
-        <div className="h-12 w-full rounded-sm bg-border-light" />
-      </div>
-    </div>
-  );
-}
-
-function CompactCardSkeleton() {
-  return (
-    <div className="rounded-md bg-surface-white shadow-sm overflow-hidden animate-pulse p-lg">
-      <div className="flex items-start justify-between gap-md">
-        <div className="flex-1 space-y-sm">
-          <div className="h-5 w-3/4 rounded-sm bg-border-light" />
-          <div className="h-4 w-full rounded-sm bg-border-light" />
-          <div className="h-3 w-1/2 rounded-sm bg-border-light" />
-        </div>
-        <div className="h-6 w-16 rounded-full bg-border-light" />
-      </div>
-    </div>
-  );
-}
 
 // ─── Active Session Card (Ongoing + Upcoming) ─────────────
 
@@ -132,7 +60,15 @@ function ActiveSessionCard({ session, userId, displayStatus }: ActiveSessionCard
   );
   const isPresent = userAttendance?.status === 'present';
   const isOngoing = displayStatus === 'ongoing';
-  const isToday = isSameDay(session.date, new Date());
+  const isToday = (() => {
+    const d = new Date(session.date);
+    const now = new Date();
+    return (
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate()
+    );
+  })();
   const canMarkAttendance = (isOngoing || isToday) && !isPresent;
 
   const handleMarkAttendance = useCallback(async () => {
@@ -336,75 +272,17 @@ function CompletedSessionCard({ session, userId }: CompletedSessionCardProps) {
 // ─── Main Page Component ──────────────────────────────────
 
 export default function LearnerSessions() {
-  const user = useAppSelector((s) => s.auth.user);
-  const [attendanceFilter, setAttendanceFilter] = useState<AttendanceFilter>('all');
-
-  // Auto-refresh every 60s so status transitions happen live
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const interval = setInterval(() => setTick((t) => t + 1), 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const { data: sessionsResponse, isLoading } = useGetSessionsQuery(
-    { limit: 50, sortBy: 'date', sortOrder: 'asc' },
-    { skip: !user?.id }
-  );
-
-  const sessions = useMemo(() => sessionsResponse?.data ?? [], [sessionsResponse]);
-
-  // Filter sessions where user is enrolled
-  const userSessions = useMemo(() => {
-    return sessions.filter(
-      (s) =>
-        user?.id &&
-        s.enrolledStaff.some((staff) => getStaffId(staff) === user.id)
-    );
-  }, [sessions, user?.id]);
-
-  // Categorize by display status
-  const ongoingSessions = useMemo(() => {
-    return userSessions.filter((s) => getDisplayStatus(s) === 'ongoing');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userSessions, tick]);
-
-  const upcomingSessions = useMemo(() => {
-    return userSessions.filter((s) => getDisplayStatus(s) === 'upcoming');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userSessions, tick]);
-
-  const completedSessions = useMemo(() => {
-    return userSessions
-      .filter((s) => getDisplayStatus(s) === 'completed')
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userSessions, tick]);
-
-  // Apply attendance filter to completed sessions
-  const filteredCompletedSessions = useMemo(() => {
-    if (attendanceFilter === 'all') return completedSessions;
-
-    return completedSessions.filter((s) => {
-      const attended = s.attendance.some(
-        (a) => getStaffId(a.staff) === user?.id && a.status === 'present'
-      );
-      return attendanceFilter === 'attended' ? attended : !attended;
-    });
-  }, [completedSessions, attendanceFilter, user?.id]);
-
-  const attendedCount = useMemo(() => {
-    return completedSessions.filter((s) =>
-      s.attendance.some(
-        (a) => getStaffId(a.staff) === user?.id && a.status === 'present'
-      )
-    ).length;
-  }, [completedSessions, user?.id]);
-
-  const FILTER_TABS: { key: AttendanceFilter; label: string; count: number }[] = [
-    { key: 'all', label: 'All', count: completedSessions.length },
-    { key: 'attended', label: 'Attended', count: attendedCount },
-    { key: 'not_attended', label: 'Not Attended', count: completedSessions.length - attendedCount },
-  ];
+  const {
+    user,
+    isLoading,
+    ongoingSessions,
+    upcomingSessions,
+    completedSessions,
+    filteredCompletedSessions,
+    attendanceFilter,
+    setAttendanceFilter,
+    filterTabs,
+  } = useLearnerSessionsData();
 
   // ── Loading state ──
   if (isLoading) {
@@ -416,8 +294,8 @@ export default function LearnerSessions() {
           <SessionCardSkeleton />
         </div>
         <div className="space-y-md">
-          <CompactCardSkeleton />
-          <CompactCardSkeleton />
+          <SessionCompactSkeleton />
+          <SessionCompactSkeleton />
         </div>
       </div>
     );
@@ -483,7 +361,7 @@ export default function LearnerSessions() {
         {/* Attendance filter tabs */}
         {completedSessions.length > 0 && (
           <div className="mt-md flex overflow-x-auto border-b border-border-light -mx-md px-md scrollbar-none">
-            {FILTER_TABS.map((tab) => (
+            {filterTabs.map((tab) => (
               <button
                 key={tab.key}
                 type="button"

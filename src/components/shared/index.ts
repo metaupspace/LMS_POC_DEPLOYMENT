@@ -1,4 +1,15 @@
+export { default as StatusBadge } from './StatusBadge';
+export { default as ProgressBar } from './ProgressBar';
+export { default as EmptyState } from './EmptyState';
+export { default as StatCard } from './StatCard';
+export { default as UserAvatar } from './UserAvatar';
+export { default as SectionHeader } from './SectionHeader';
+export { default as ConfirmDialog } from './ConfirmDialog';
 export { default as NotificationBell } from './NotificationBell';
+export { default as SideNav } from './SideNav';
+export { default as PWAInstallPrompt } from './PWAInstallPrompt';
+export { default as ImageModal } from '../ui/ImageModal';
+export { default as PDFViewer } from '../ui/PDFViewer';
 export { default as ProfileCard } from './ProfileCard';
 export { default as ProfileDropdown } from './ProfileDropdown';
 export { default as LanguageSwitcher } from './LanguageSwitcher';
