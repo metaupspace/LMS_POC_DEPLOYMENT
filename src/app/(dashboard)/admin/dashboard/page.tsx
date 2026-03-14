@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Users,
@@ -26,6 +26,7 @@ import { Card, Button, LoadingSpinner, Badge } from '@/components/ui';
 import type { ReactNode } from 'react';
 import { UserRole } from '@/types/enums';
 import { useTranslation } from '@/i18n';
+import { getDisplayStatus, useAutoRefreshTick } from '@/hooks/useSessionStatus';
 
 // ─── Stat Card Config ───────────────────────────────────
 
@@ -79,26 +80,6 @@ const statCards: StatCardConfig[] = [
 
 
 
-
-function getDisplayStatus(session: { status: string; date: string; timeSlot: string; duration?: number }): string {
-  if (session.status === 'cancelled') return 'cancelled';
-
-  const sessionDate = new Date(session.date);
-  const parts = (session.timeSlot ?? '').split(':');
-  const hours = Number(parts[0]);
-  const minutes = Number(parts[1]);
-  if (!isNaN(hours) && !isNaN(minutes)) {
-    sessionDate.setHours(hours, minutes, 0, 0);
-  }
-
-  const now = Date.now();
-  const startTime = sessionDate.getTime();
-  const endTime = startTime + (session.duration ?? 0) * 60 * 1000;
-
-  if (now >= endTime) return 'completed';
-  if (now >= startTime) return 'ongoing';
-  return 'upcoming';
-}  
 
 // ─── Relative Time Helper ───────────────────────────────
 
@@ -169,11 +150,7 @@ export default function DashboardHome() {
   });
 
   // Auto-refresh every 60s so upcoming sessions list updates live
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const interval = setInterval(() => setTick((t) => t + 1), 60000);
-    return () => clearInterval(interval);
-  }, []);
+  useAutoRefreshTick();
 
   const stats = statsResponse?.data;
   const allSessions = sessionsResponse?.data ?? [];

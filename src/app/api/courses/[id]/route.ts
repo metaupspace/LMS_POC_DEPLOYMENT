@@ -8,7 +8,7 @@ import ProofOfWork from '@/lib/db/models/ProofOfWork';
 import { withAuth } from '@/lib/auth/rbac';
 import { updateCourseSchema } from '@/lib/validators/course';
 import { successResponse, errorResponse } from '@/lib/utils/apiResponse';
-import { redisDelPattern } from '@/lib/redis/client';
+import { redisDel, redisDelPattern } from '@/lib/redis/client';
 import { publishToQueue } from '@/lib/rabbitmq/producer';
 import { QUEUE_NAMES } from '@/lib/rabbitmq/connection';
 
@@ -100,8 +100,11 @@ export const PATCH = withAuth(
         }).catch(() => {});
       }
 
-      // Invalidate course list cache
-      await redisDelPattern('courses:list:*').catch(() => {});
+      // Invalidate course caches
+      await Promise.all([
+        redisDelPattern('courses:list:*'),
+        redisDel(`course-analytics:${id}`),
+      ]).catch(() => {});
 
       return successResponse(updated, 'Course updated successfully');
     } catch (err) {
@@ -134,8 +137,11 @@ export const DELETE = withAuth(
       await ProofOfWork.deleteMany({ course: id });
       await Course.findByIdAndDelete(id);
 
-      // Invalidate course list cache
-      await redisDelPattern('courses:list:*').catch(() => {});
+      // Invalidate course caches
+      await Promise.all([
+        redisDelPattern('courses:list:*'),
+        redisDel(`course-analytics:${id}`),
+      ]).catch(() => {});
 
       return successResponse(null, 'Course deleted successfully');
     } catch (err) {

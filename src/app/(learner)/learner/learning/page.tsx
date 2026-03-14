@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
@@ -26,102 +26,20 @@ import { Card, Badge, Button } from '@/components/ui';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 import {
-  useGetSessionsQuery,
   useMarkAttendanceMutation,
   type SessionData,
 } from '@/store/slices/api/sessionApi';
-import { useGetProgressQuery, type ProgressData } from '@/store/slices/api/progressApi';
-import { useGetCoursesQuery, type CourseData } from '@/store/slices/api/courseApi';
-import { useGetModulesQuery, getQuizId, type ModuleData } from '@/store/slices/api/moduleApi';
-import { useGetTestsQuery, useGetCertificationsQuery, type TestData, type CertificationData } from '@/store/slices/api/testApi';
-
-// ─── Types ──────────────────────────────────────────────────
-
-type TabKey = 'ongoing' | 'assigned' | 'completed' | 'sessions';
-
-interface TabDef {
-  key: TabKey;
-  label: string;
-}
-
-const TABS: TabDef[] = [
-  { key: 'ongoing', label: 'Ongoing' },
-  { key: 'assigned', label: 'Assigned' },
-  { key: 'completed', label: 'Completed' },
-  { key: 'sessions', label: 'Sessions' },
-];
-
-type CourseCategory = 'ongoing' | 'assigned' | 'completed';
-
-// ─── Helpers ────────────────────────────────────────────────
-
-function isSameDay(dateStr: string, reference: Date): boolean {
-  const d = new Date(dateStr);
-  return (
-    d.getFullYear() === reference.getFullYear() &&
-    d.getMonth() === reference.getMonth() &&
-    d.getDate() === reference.getDate()
-  );
-}
-
-/** Derive display status based on current time vs session date+timeSlot+duration. */
-function getSessionDisplayStatus(session: SessionData): 'upcoming' | 'ongoing' | 'completed' {
-  if (session.status === 'completed') return 'completed';
-
-  const sessionDate = new Date(session.date);
-  const [hours = NaN, minutes = NaN] = (session.timeSlot ?? '').split(':').map(Number);
-  if (!isNaN(hours) && !isNaN(minutes)) {
-    sessionDate.setHours(hours, minutes, 0, 0);
-  }
-
-  const now = Date.now();
-  const startTime = sessionDate.getTime();
-  const endTime = startTime + (session.duration ?? 0) * 60 * 1000;
-
-  if (now >= endTime) return 'completed';
-  if (now >= startTime) return 'ongoing';
-  return 'upcoming';
-}
-
-function isPastDate(dateStr: string, reference: Date): boolean {
-  const d = new Date(dateStr);
-  d.setHours(0, 0, 0, 0);
-  const ref = new Date(reference);
-  ref.setHours(0, 0, 0, 0);
-  return d < ref;
-}
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
-function categorizeCourse(
-  modules: ModuleData[],
-  progressMap: Map<string, ProgressData>
-): CourseCategory {
-  if (modules.length === 0) return 'assigned';
-
-  let hasStarted = false;
-  let allCompleted = true;
-
-  for (const mod of modules) {
-    const p = progressMap.get(mod._id);
-    if (p?.status === 'in_progress' || p?.status === 'completed') {
-      hasStarted = true;
-    }
-    if (!p || p.status !== 'completed') {
-      allCompleted = false;
-    }
-  }
-
-  if (allCompleted) return 'completed';
-  if (hasStarted) return 'ongoing';
-  return 'assigned';
-}
+import type { ProgressData } from '@/store/slices/api/progressApi';
+import type { CourseData } from '@/store/slices/api/courseApi';
+import { getQuizId, type ModuleData } from '@/store/slices/api/moduleApi';
+import { getDisplayStatus } from '@/hooks/useSessionStatus';
+import {
+  useLearnerLearningData,
+  TABS,
+  type CourseCategory,
+  isSameDay,
+  formatDate,
+} from '@/hooks/useLearnerLearningData';
 
 // ─── Skeleton Components ────────────────────────────────────
 
@@ -504,7 +422,7 @@ function SessionUpcomingCard({ session, userId, isToday }: SessionUpcomingCardPr
           </div>
         )}
         {(() => {
-          const ds = getSessionDisplayStatus(session);
+          const ds = getDisplayStatus(session);
           if (ds === 'ongoing') return (
             <div className="absolute top-sm right-sm"><Badge variant="info">Ongoing</Badge></div>
           );
@@ -549,7 +467,7 @@ function SessionUpcomingCard({ session, userId, isToday }: SessionUpcomingCardPr
         </div>
 
         {/* Join Now button for online sessions */}
-        {session.mode === 'online' && session.meetingLink && (isToday || getSessionDisplayStatus(session) === 'ongoing') && (
+        {session.mode === 'online' && session.meetingLink && (isToday || getDisplayStatus(session) === 'ongoing') && (
           <a
             href={session.meetingLink}
             target="_blank"
@@ -568,7 +486,7 @@ function SessionUpcomingCard({ session, userId, isToday }: SessionUpcomingCardPr
               <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
               <Badge variant="success">Present</Badge>
             </div>
-          ) : isToday || getSessionDisplayStatus(session) === 'ongoing' ? (
+          ) : isToday || getDisplayStatus(session) === 'ongoing' ? (
             <div className="space-y-sm">
               <input
                 type="text"
@@ -659,193 +577,27 @@ function SessionPastCard({ session, userId }: SessionPastCardProps) {
 
 export default function MyLearning() {
   const router = useRouter();
-  const user = useAppSelector((s) => s.auth.user);
-  const [activeTab, setActiveTab] = useState<TabKey>('ongoing');
-
-  // Auto-refresh every 60s so session status badges update live
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const interval = setInterval(() => setTick((t) => t + 1), 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // ── Queries ──
-  const { data: sessionsResponse, isLoading: isLoadingSessions } = useGetSessionsQuery(
-    { limit: 50, sortBy: 'date', sortOrder: 'asc' },
-    { skip: !user?.id }
-  );
-
-  const { data: progressResponse, isLoading: isLoadingProgress } = useGetProgressQuery(
-    { limit: 200 },
-    { skip: !user?.id }
-  );
-
-  const { data: coursesResponse, isLoading: isLoadingCourses } = useGetCoursesQuery(
-    { status: 'active', limit: 50 },
-    { skip: !user?.id }
-  );
-
-  const { data: modulesResponse, isLoading: isLoadingModules } = useGetModulesQuery(
-    { limit: 200 },
-    { skip: !user?.id }
-  );
-
-  const { data: allTestsResponse } = useGetTestsQuery(
-    { includeCompleted: true },
-    { skip: !user?.id }
-  );
-
-  const { data: certsResponse } = useGetCertificationsQuery(
-    undefined,
-    { skip: !user?.id }
-  );
-
-  // ── Derived data ──
-  const sessions = useMemo(() => sessionsResponse?.data ?? [], [sessionsResponse]);
-  const progressList = useMemo(() => progressResponse?.data ?? [], [progressResponse]);
-  const courses = useMemo(() => coursesResponse?.data ?? [], [coursesResponse]);
-  const modules = useMemo(() => modulesResponse?.data ?? [], [modulesResponse]);
-
-  const today = useMemo(() => new Date(), []);
-
-  // Progress map keyed by moduleId
-  const progressMap = useMemo(() => {
-    const map = new Map<string, ProgressData>();
-    for (const p of progressList) {
-      map.set(p.module, p);
-    }
-    return map;
-  }, [progressList]);
-
-  // Assigned courses (where user is in assignedStaff)
-  const assignedCourses = useMemo(() => {
-    return courses.filter((c) =>
-      user?.id && c.assignedStaff.some((s) => (typeof s === 'string' ? s : s._id) === user.id)
-    );
-  }, [courses, user?.id]);
-
-  // Group modules by courseId (only from assigned courses)
-  const courseModulesMap = useMemo(() => {
-    const map = new Map<string, ModuleData[]>();
-    const assignedIds = new Set(assignedCourses.map((c) => c._id));
-
-    for (const mod of modules) {
-      if (!assignedIds.has(mod.course)) continue;
-      const existing = map.get(mod.course) ?? [];
-      existing.push(mod);
-      map.set(mod.course, existing);
-    }
-
-    // Sort modules by order within each course
-    for (const [key, mods] of map) {
-      map.set(key, mods.sort((a, b) => a.order - b.order));
-    }
-
-    return map;
-  }, [modules, assignedCourses]);
-
-  // ── Course categorization ──
-  const ongoingCourses = useMemo(() => {
-    return assignedCourses.filter((c) => {
-      const mods = courseModulesMap.get(c._id) ?? [];
-      return categorizeCourse(mods, progressMap) === 'ongoing';
-    });
-  }, [assignedCourses, courseModulesMap, progressMap]);
-
-  const assignedNotStarted = useMemo(() => {
-    return assignedCourses.filter((c) => {
-      const mods = courseModulesMap.get(c._id) ?? [];
-      return categorizeCourse(mods, progressMap) === 'assigned';
-    });
-  }, [assignedCourses, courseModulesMap, progressMap]);
-
-  const completedCourses = useMemo(() => {
-    return assignedCourses.filter((c) => {
-      const mods = courseModulesMap.get(c._id) ?? [];
-      return categorizeCourse(mods, progressMap) === 'completed';
-    });
-  }, [assignedCourses, courseModulesMap, progressMap]);
-
-  // ── Sessions: filter where user is enrolled ──
-  const userSessions = useMemo(() => {
-    return sessions.filter(
-      (s) =>
-        user?.id &&
-        s.enrolledStaff.some(
-          (staff) => (typeof staff === 'string' ? staff : staff._id) === user.id
-        )
-    );
-  }, [sessions, user?.id]);
-
-  const upcomingSessions = useMemo(() => {
-    return userSessions.filter(
-      (s) => !isPastDate(s.date, today) && s.status !== 'cancelled'
-    );
-  }, [userSessions, today]);
-
-  const pastSessions = useMemo(() => {
-    return userSessions.filter(
-      (s) => isPastDate(s.date, today) || s.status === 'completed'
-    );
-  }, [userSessions, today]);
-
-  // ── Certification tests ──
-  const allTests = useMemo(
-    () => (allTestsResponse?.data ?? []) as TestData[],
-    [allTestsResponse]
-  );
-
-  const certifications = useMemo(
-    () => (certsResponse?.data ?? []) as CertificationData[],
-    [certsResponse]
-  );
-
-  const certMap = useMemo(() => {
-    const map = new Map<string, CertificationData>();
-    for (const c of certifications) {
-      const testId = (typeof c.test === 'object' ? c.test._id : c.test)?.toString();
-      if (testId) map.set(testId, c);
-    }
-    return map;
-  }, [certifications]);
-
-  const certifiedTests = useMemo(
-    () => allTests.filter((t) => t.myStatus === 'certified' || certMap.has(t._id)),
-    [allTests, certMap]
-  );
-
-  const exhaustedTests = useMemo(
-    () =>
-      allTests.filter((t) => {
-        if (t.myStatus === 'certified' || certMap.has(t._id)) return false;
-        if (t.myStatus === 'exhausted') return true;
-        const attempts = t.myAttemptCount ?? t.myAttempts?.filter((a) => a.status === 'graded').length ?? 0;
-        return attempts >= t.maxAttempts;
-      }),
-    [allTests, certMap]
-  );
-
-  const pendingTests = useMemo(
-    () =>
-      allTests.filter((t) => {
-        if (t.myStatus === 'certified' || certMap.has(t._id)) return false;
-        if (t.myStatus === 'exhausted') return false;
-        const attempts = t.myAttemptCount ?? t.myAttempts?.filter((a) => a.status === 'graded').length ?? 0;
-        return attempts < t.maxAttempts;
-      }),
-    [allTests, certMap]
-  );
-
-  // ── Tab counts ──
-  const tabCounts: Record<TabKey, number> = useMemo(() => ({
-    ongoing: ongoingCourses.length,
-    assigned: assignedNotStarted.length,
-    completed: completedCourses.length,
-    sessions: userSessions.length,
-  }), [ongoingCourses.length, assignedNotStarted.length, completedCourses.length, userSessions.length]);
-
-  // ── Loading ──
-  const isLoading = isLoadingSessions || isLoadingProgress || isLoadingCourses || isLoadingModules;
+  const {
+    user,
+    activeTab,
+    setActiveTab,
+    isLoading,
+    today,
+    progressMap,
+    courseModulesMap,
+    ongoingCourses,
+    assignedNotStarted,
+    completedCourses,
+    userSessions,
+    upcomingSessions,
+    pastSessions,
+    allTests,
+    certMap,
+    certifiedTests,
+    pendingTests,
+    exhaustedTests,
+    tabCounts,
+  } = useLearnerLearningData();
 
   // ─── Render ───────────────────────────────────────────────
 

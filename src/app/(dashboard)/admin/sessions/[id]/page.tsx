@@ -42,6 +42,7 @@ import {
 } from '@/store/slices/api/sessionApi';
 import { useGetUsersQuery, type UserData } from '@/store/slices/api/userApi';
 import { getErrorMessage } from '@/lib/utils/getErrorMessage';
+import { getDisplayStatus } from '@/hooks/useSessionStatus';
 
 // ─── Constants ──────────────────────────────────────────────
 
@@ -58,27 +59,6 @@ const statusVariantMap: Record<string, BadgeVariant> = {
 };
 
 // ─── Helpers ────────────────────────────────────────────────
-
-/** Derive a display status based on current time vs session date+timeSlot+duration. */
-function getDisplayStatus(session: { status: string; date: string; timeSlot: string; duration?: number }): string {
-  if (session.status === 'cancelled') return 'cancelled';
-
-  const sessionDate = new Date(session.date);
-  const parts = (session.timeSlot ?? '').split(':');
-  const hours = Number(parts[0]);
-  const minutes = Number(parts[1]);
-  if (!isNaN(hours) && !isNaN(minutes)) {
-    sessionDate.setHours(hours, minutes, 0, 0);
-  }
-
-  const now = Date.now();
-  const startTime = sessionDate.getTime();
-  const endTime = startTime + (session.duration ?? 0) * 60 * 1000;
-
-  if (now >= endTime) return 'completed';
-  if (now >= startTime) return 'ongoing';
-  return 'upcoming';
-}
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);

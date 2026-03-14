@@ -6,6 +6,7 @@ import TrainingSession from '@/lib/db/models/TrainingSession';
 import { withAuth } from '@/lib/auth/rbac';
 import { successResponse, errorResponse } from '@/lib/utils/apiResponse';
 import { BADGE_TIERS, POINTS } from '@/lib/constants';
+import { redisGet, redisSet } from '@/lib/redis/client';
 
 // GET /api/gamification/[userId]
 export const GET = withAuth(
@@ -20,6 +21,16 @@ export const GET = withAuth(
       if (currentRole === 'staff' && userId !== currentUserId) {
         return errorResponse('Insufficient permissions', 403);
       }
+
+      // Check cache first (short TTL since points change on activity)
+      const cacheKey = `gamification:${userId}`;
+      const cached = await redisGet<{
+        totalPoints: number;
+        badges: unknown[];
+        streak: unknown;
+        nextBadge: unknown;
+      }>(cacheKey);
+      if (cached) return successResponse(cached, 'Gamification data retrieved');
 
       let gamification = await Gamification.findOne({ user: userId }).lean();
       if (!gamification) {
@@ -37,20 +48,20 @@ export const GET = withAuth(
       }
 
       // Reconcile: check if gamification points are in sync with LearnerProgress + session attendance
-      const progressRecords = await LearnerProgress.find({ user: userId })
-        .select('videoPoints quizPoints proofOfWorkPoints')
-        .lean();
+      const [progressRecords, attendedSessionCount] = await Promise.all([
+        LearnerProgress.find({ user: userId })
+          .select('videoPoints quizPoints proofOfWorkPoints')
+          .lean(),
+        TrainingSession.countDocuments({
+          'attendance.staff': userId,
+          'attendance.status': 'present',
+        }),
+      ]);
 
       const modulePoints = progressRecords.reduce(
         (sum, p) => sum + (p.videoPoints || 0) + (p.quizPoints || 0) + (p.proofOfWorkPoints || 0),
         0
       );
-
-      // Count sessions where user marked attendance as present
-      const attendedSessionCount = await TrainingSession.countDocuments({
-        'attendance.staff': userId,
-        'attendance.status': 'present',
-      });
 
       const totalEarnedPoints = modulePoints + attendedSessionCount * POINTS.SESSION_ATTENDANCE;
 
@@ -127,6 +138,9 @@ export const GET = withAuth(
             }
           : null,
       };
+
+      // Cache for 60 seconds
+      await redisSet(cacheKey, result, 60).catch(() => {});
 
       return successResponse(result, 'Gamification data retrieved');
     } catch (err) {

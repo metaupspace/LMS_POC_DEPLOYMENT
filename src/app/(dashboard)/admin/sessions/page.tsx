@@ -1,7 +1,5 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Plus, CalendarDays, LayoutGrid, MapPin, Clock } from 'lucide-react';
 
@@ -15,26 +13,11 @@ import {
   Calendar,
   LoadingSpinner,
 } from '@/components/ui';
-import type { CalendarEvent } from '@/components/ui';
-import {
-  useGetSessionsQuery,
-  type SessionData,
-} from '@/store/slices/api/sessionApi';
+import type { SessionData } from '@/store/slices/api/sessionApi';
 import { useTranslation } from '@/i18n';
+import { useAdminSessionsData } from '@/hooks/useAdminSessionsData';
 
 // ─── Constants ──────────────────────────────────────────────
-
-const STATUS_OPTIONS = [
-  { label: 'All', value: '' },
-  { label: 'Upcoming', value: 'upcoming' },
-  { label: 'Ongoing', value: 'ongoing' },
-  { label: 'Completed', value: 'completed' },
-  { label: 'Cancelled', value: 'cancelled' },
-];
-
-const LIMIT = 9;
-
-type ViewMode = 'card' | 'calendar';
 
 type BadgeVariant = 'success' | 'warning' | 'error' | 'info' | 'default';
 
@@ -56,124 +39,33 @@ function formatDate(dateStr: string): string {
   });
 }
 
-/** Derive a display status based on current time vs session date+timeSlot+duration. */
-function getDisplayStatus(session: SessionData): string {
-  if (session.status === 'cancelled') return 'cancelled';
-
-  const sessionDate = new Date(session.date);
-  const parts = (session.timeSlot ?? '').split(':');
-  const hours = Number(parts[0]);
-  const minutes = Number(parts[1]);
-  if (!isNaN(hours) && !isNaN(minutes)) {
-    sessionDate.setHours(hours, minutes, 0, 0);
-  }
-
-  const now = Date.now();
-  const startTime = sessionDate.getTime();
-  const endTime = startTime + (session.duration ?? 0) * 60 * 1000;
-
-  if (now >= endTime) return 'completed';
-  if (now >= startTime) return 'ongoing';
-  return 'upcoming';
-}
-
 // ─── Component ──────────────────────────────────────────────
 
 export default function SessionsListPage() {
-  const router = useRouter();
   const { t } = useTranslation();
 
-  // ── View & Filters ──────────────────────────────────────
-  const [viewMode, setViewMode] = useState<ViewMode>('card');
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
-
-  // Auto-refresh every 60s so status transitions happen live
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const interval = setInterval(() => setTick((t) => t + 1), 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // ── Calendar day selection ──────────────────────────────
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-
-  // ── Query ───────────────────────────────────────────────
-  // Fetch all sessions (no server-side status filter) so we can filter by computed display status
-  const { data, isLoading, isFetching } = useGetSessionsQuery({
-    limit: 200,
-    search: search || undefined,
-    sortBy: 'date',
-    sortOrder: 'desc',
-  });
-
-  const allFetchedSessions = useMemo(() => data?.data ?? [], [data]);
-
-  // Filter by computed display status on the frontend
-  const statusFilteredSessions = useMemo(() => {
-    if (!status) return allFetchedSessions;
-    return allFetchedSessions.filter((s) => getDisplayStatus(s) === status);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allFetchedSessions, status, tick]);
-
-  // Client-side pagination
-  const totalFiltered = statusFilteredSessions.length;
-  const totalPages = Math.ceil(totalFiltered / LIMIT);
-  const sessions = statusFilteredSessions.slice((page - 1) * LIMIT, page * LIMIT);
-  const pagination = totalFiltered > 0
-    ? { total: totalFiltered, totalPages, page, limit: LIMIT }
-    : undefined;
-
-  const allSessions = allFetchedSessions;
-
-  // ── Calendar events ─────────────────────────────────────
-  const calendarEvents: CalendarEvent[] = useMemo(
-    () =>
-      allSessions.map((s) => {
-        const ds = getDisplayStatus(s);
-        return {
-          date: s.date.split('T')[0] ?? s.date,
-          title: s.title,
-          status: (ds === 'ongoing' ? 'upcoming' : ds) as CalendarEvent['status'],
-        };
-      }),
-    [allSessions]
-  );
-
-  // ── Sessions for selected day ───────────────────────────
-  const selectedDaySessions = useMemo(() => {
-    if (!selectedDate) return [];
-    return allSessions.filter((s) => s.date.split('T')[0] === selectedDate);
-  }, [selectedDate, allSessions]);
-
-  // ── Handlers ────────────────────────────────────────────
-
-  const handleSearchChange = useCallback((value: string) => {
-    setSearch(value);
-    setPage(1);
-  }, []);
-
-  const handleStatusChange = useCallback((value: string) => {
-    setStatus(value);
-    setPage(1);
-  }, []);
-
-  const handleCardClick = useCallback(
-    (sessionId: string) => {
-      router.push(`/admin/sessions/${sessionId}`);
-    },
-    [router]
-  );
-
-  const handleDayClick = useCallback((_date: Date, dayEvents: CalendarEvent[]) => {
-    if (dayEvents.length > 0) {
-      const dateKey = `${_date.getFullYear()}-${String(_date.getMonth() + 1).padStart(2, '0')}-${String(_date.getDate()).padStart(2, '0')}`;
-      setSelectedDate(dateKey);
-    } else {
-      setSelectedDate(null);
-    }
-  }, []);
+  const {
+    viewMode,
+    setViewMode,
+    search,
+    status,
+    page,
+    setPage,
+    selectedDate,
+    isLoading,
+    isFetching,
+    sessions,
+    pagination,
+    calendarEvents,
+    selectedDaySessions,
+    handleSearchChange,
+    handleStatusChange,
+    handleCardClick,
+    handleDayClick,
+    navigateToCreate,
+    STATUS_OPTIONS,
+    LIMIT,
+  } = useAdminSessionsData();
 
   // ── Loading State ───────────────────────────────────────
 
@@ -194,7 +86,7 @@ export default function SessionsListPage() {
         <h1 className="text-h1 text-text-primary">{t('sessions.trainingSessions')}</h1>
         <Button
           leftIcon={<Plus className="h-4 w-4" />}
-          onClick={() => router.push('/admin/sessions/create')}
+          onClick={navigateToCreate}
         >
           {t('sessions.scheduleSession')}
         </Button>
@@ -297,7 +189,7 @@ export default function SessionsListPage() {
                 <Button
                   className="mt-lg"
                   leftIcon={<Plus className="h-4 w-4" />}
-                  onClick={() => router.push('/admin/sessions/create')}
+                  onClick={navigateToCreate}
                 >
                   Schedule Session
                 </Button>
@@ -346,7 +238,6 @@ interface SessionCardProps {
 }
 
 function SessionCard({ session, onClick }: SessionCardProps) {
-  // const displayStatus = getDisplayStatus(session);
   const statusVariant = statusVariantMap[session.status] ?? 'default';
 
   return (
@@ -403,7 +294,6 @@ function SessionCard({ session, onClick }: SessionCardProps) {
             {session.instructor ? `Instructor assigned` : 'No instructor'}
           </span>
           <Badge variant={statusVariant}>
-            {/* {displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)} */}
             {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
           </Badge>
         </div>
