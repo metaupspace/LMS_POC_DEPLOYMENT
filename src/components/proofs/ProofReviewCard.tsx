@@ -28,7 +28,7 @@ interface ProofReviewCardProps {
   fileUrl?: string;
   fileType?: string;
   reviewNote?: string;
-  onReview: (proofId: string, status: 'approved' | 'redo_requested', note: string) => Promise<void>;
+  onReview: (_proofId: string, _status: 'approved' | 'redo_requested', _note: string) => Promise<void>;
   isReviewing?: boolean;
 }
 

@@ -88,7 +88,7 @@ export interface LearnerLearningData {
 
   // Tab state
   activeTab: TabKey;
-  setActiveTab: (tab: TabKey) => void;
+  setActiveTab: (_tab: TabKey) => void;
 
   // Loading
   isLoading: boolean;

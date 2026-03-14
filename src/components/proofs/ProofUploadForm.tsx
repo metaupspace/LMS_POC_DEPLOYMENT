@@ -5,7 +5,7 @@ import { Upload } from 'lucide-react';
 import { Button, FileUpload } from '@/components/ui';
 
 interface ProofUploadFormProps {
-  onUpload: (file: File) => Promise<void>;
+  onUpload: (_file: File) => Promise<void>;
   onSkip?: () => void;
   isUploading?: boolean;
   accept?: string;

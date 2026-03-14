@@ -7,7 +7,7 @@ import {
 import { useGetTestsQuery, type TestData } from '@/store/slices/api/testApi';
 import {
   useGetSessionsQuery,
-  type SessionData,
+  // type SessionData,
 } from '@/store/slices/api/sessionApi';
 import { useGetProgressQuery, type ProgressData } from '@/store/slices/api/progressApi';
 import { useGetCoursesQuery, type CourseData } from '@/store/slices/api/courseApi';

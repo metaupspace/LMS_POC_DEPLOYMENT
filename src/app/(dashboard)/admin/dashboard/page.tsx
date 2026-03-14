@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+// import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Users,
@@ -10,7 +10,6 @@ import {
   UserCog,
   Plus,
   ArrowRight,
-  Activity,
   Clock,
   MapPin,
   ClipboardCheck,
@@ -21,7 +20,7 @@ import {
 import { useAppSelector } from '@/store/hooks';
 import { useGetDashboardStatsQuery } from '@/store/slices/api/dashboardApi';
 import { useGetSessionsQuery } from '@/store/slices/api/sessionApi';
-import { useGetNotificationsQuery } from '@/store/slices/api/notificationApi';
+import RecentActivities from '@/components/dashboard/RecentActivities';
 import { Card, Button, LoadingSpinner, Badge } from '@/components/ui';
 import type { ReactNode } from 'react';
 import { UserRole } from '@/types/enums';
@@ -140,21 +139,11 @@ export default function DashboardHome() {
     sortOrder: 'asc',
   });
 
-  const {
-    data: notificationsResponse,
-    isLoading: notificationsLoading,
-  } = useGetNotificationsQuery({
-    limit: 50,
-    sortBy: 'createdAt',
-    sortOrder: 'desc',
-  });
-
   // Auto-refresh every 60s so upcoming sessions list updates live
   useAutoRefreshTick();
 
   const stats = statsResponse?.data;
   const allSessions = sessionsResponse?.data ?? [];
-  const notifications = notificationsResponse?.data ?? [];
 
   const sessions = allSessions.filter((s) => getDisplayStatus(s) === 'upcoming').slice(0, 3);
 
@@ -280,51 +269,7 @@ export default function DashboardHome() {
       <div className="grid grid-cols-1 gap-md lg:grid-cols-3">
         {/* Recent Activities — 2/3 width */}
         <div className="lg:col-span-2">
-          <Card
-            header={
-              <div className="flex items-center gap-sm">
-                <Activity className="h-5 w-5 text-primary-main" />
-                <h2 className="text-h3 text-text-primary">
-                  {t('dashboard.recentActivity')}
-                </h2>
-              </div>
-            }
-          >
-            {notificationsLoading ? (
-              <div className="flex items-center justify-center py-xl">
-                <LoadingSpinner variant="inline" text="Loading activities..." />
-              </div>
-            ) : notifications.length === 0 ? (
-              <p className="py-xl text-center text-body-md text-text-secondary">
-                No recent activities
-              </p>
-            ) : (
-              <ul className="divide-y divide-border-light">
-                {notifications.map((notification) => (
-                  <li
-                    key={notification._id}
-                    className="flex items-start gap-md py-md first:pt-0 last:pb-0"
-                  >
-                    <span className="mt-[6px] h-2 w-2 shrink-0 rounded-full bg-primary-main" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-body-md text-text-primary">
-                        {notification.message}
-                      </p>
-                      <div className="mt-xs flex items-center gap-xs">
-                        <Clock className="h-3 w-3 text-text-secondary" />
-                        <span className="text-caption text-text-secondary">
-                          {getRelativeTime(notification.createdAt)}
-                        </span>
-                      </div>
-                    </div>
-                    {!notification.read && (
-                      <Badge variant="info">New</Badge>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
+          <RecentActivities />
         </div>
 
         {/* Quick Actions — 1/3 width */}

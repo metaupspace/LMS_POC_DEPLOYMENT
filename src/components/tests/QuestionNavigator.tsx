@@ -2,7 +2,7 @@ interface QuestionNavigatorProps {
   totalQuestions: number;
   currentQuestion: number;
   answeredQuestions: Record<number, number>;
-  onNavigate: (questionIndex: number) => void;
+  onNavigate: (_questionIndex: number) => void;
   className?: string;
 }
 

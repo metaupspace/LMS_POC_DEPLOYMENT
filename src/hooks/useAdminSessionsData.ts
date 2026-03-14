@@ -5,7 +5,7 @@ import type { CalendarEvent } from '@/components/ui';
 import { getDisplayStatus, useAutoRefreshTick } from '@/hooks/useSessionStatus';
 import {
   useGetSessionsQuery,
-  type SessionData,
+  // type SessionData,
 } from '@/store/slices/api/sessionApi';
 
 // ─── Constants ──────────────────────────────────────────────

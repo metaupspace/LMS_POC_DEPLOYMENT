@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useAppSelector } from '@/store/hooks';
 import {
   useGetSessionsQuery,
-  type SessionData,
+  // type SessionData,
 } from '@/store/slices/api/sessionApi';
 import { getDisplayStatus, useAutoRefreshTick } from '@/hooks/useSessionStatus';
 

@@ -6,7 +6,7 @@ import { Button, Badge } from '@/components/ui';
 
 interface AttendanceCodeInputProps {
   isPresent: boolean;
-  onSubmit: (code: string) => Promise<void>;
+  onSubmit: (_code: string) => Promise<void>;
   isLoading?: boolean;
 }
 
