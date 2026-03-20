@@ -11,6 +11,10 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css}\"",
     "seed": "npx tsx scripts/seed-admin.ts",
+    "seed:users": "npx tsx scripts/seed-users.ts",
+    "seed:delete": "npx tsx scripts/delete-seed-users.ts",
+    "seed:all": "npx tsx scripts/seed-admin.ts && npx tsx scripts/seed-users.ts",
+    "db:indexes": "npx tsx scripts/add-indexes.ts",
     "worker": "npx tsx workers/rabbitmq-worker.ts",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"

@@ -4,6 +4,7 @@ import Notification from '@/lib/db/models/Notification';
 import { withAuth } from '@/lib/auth/rbac';
 import { paginatedResponse, errorResponse } from '@/lib/utils/apiResponse';
 import { getPaginationParams, buildPaginationMeta } from '@/lib/utils/pagination';
+import { redisGet, redisSet } from '@/lib/redis/client';
 import type { FilterQuery } from 'mongoose';
 import type { INotification } from '@/types';
 
@@ -28,6 +29,14 @@ export const GET = withAuth(
 
       const skip = (page - 1) * limit;
 
+      // Cache unread count separately (polled frequently)
+      const countCacheKey = `notifications:unread:${currentUserId}`;
+      let unreadCount = await redisGet<number>(countCacheKey);
+      if (unreadCount === null) {
+        unreadCount = await Notification.countDocuments({ user: currentUserId, read: false });
+        await redisSet(countCacheKey, unreadCount, 30).catch(() => {});
+      }
+
       const [notifications, total] = await Promise.all([
         Notification.find(filter)
           .sort({ createdAt: -1 })
@@ -38,7 +47,11 @@ export const GET = withAuth(
       ]);
 
       const pagination = buildPaginationMeta(total, page, limit);
-      return paginatedResponse(notifications, pagination, 'Notifications retrieved');
+
+      // Include unreadCount in the response data
+      const data = notifications.map((n) => ({ ...n, _unreadCount: unreadCount }));
+      // Attach unreadCount as a top-level field via a custom pagination meta
+      return paginatedResponse(data, { ...pagination, unreadCount } as typeof pagination, 'Notifications retrieved');
     } catch (err) {
       console.error('[Notifications/GET] Error:', err instanceof Error ? err.message : err);
       return errorResponse('Internal server error', 500);

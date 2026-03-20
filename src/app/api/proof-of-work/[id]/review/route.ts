@@ -9,6 +9,7 @@ import { successResponse, errorResponse } from '@/lib/utils/apiResponse';
 import { publishToQueue } from '@/lib/rabbitmq/producer';
 import { QUEUE_NAMES } from '@/lib/rabbitmq/connection';
 import { POINTS, BADGE_TIERS } from '@/lib/constants';
+import { redisDel } from '@/lib/redis/client';
 import { z } from 'zod';
 
 const reviewSchema = z.object({
@@ -89,6 +90,14 @@ export const POST = withAuth(
 
         await gamification.save();
       }
+
+      // Invalidate caches after proof review
+      const learnerId2 = record.user.toString();
+      const courseId = record.course.toString();
+      await Promise.all([
+        redisDel(`gamification:${learnerId2}`),
+        redisDel(`course-analytics:${courseId}`),
+      ]).catch(() => {});
 
       // Notify the learner about the review result
       const course = await Course.findById(record.course).select('title').lean();

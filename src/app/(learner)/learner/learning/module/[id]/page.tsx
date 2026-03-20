@@ -48,19 +48,14 @@ import {
 } from '@/store/slices/api/progressApi';
 import { useUploadProofMutation } from '@/store/slices/api/proofOfWorkApi';
 import { useGetUserGamificationQuery } from '@/store/slices/api/gamificationApi';
+import { POINTS } from '@/hooks/usePointsCalculation';
+import { BADGE_TIERS } from '@/lib/constants';
 
 // ─── Constants ──────────────────────────────────────────────
 
-const BADGE_TIERS = [
-  { name: 'Rookie', threshold: 1000, icon: '\u{1F949}' },
-  { name: 'Silver', threshold: 2000, icon: '\u{1F948}' },
-  { name: 'Gold', threshold: 3000, icon: '\u{1F947}' },
-  { name: 'Premium', threshold: 5000, icon: '\u{1F48E}' },
-] as const;
-
-const VIDEO_POINTS = 30;
-const QUIZ_POINTS = 30;
-const PROOF_POINTS = 30;
+const VIDEO_POINTS = POINTS.VIDEO_COMPLETION;
+const QUIZ_POINTS = POINTS.QUIZ_PASS;
+const PROOF_POINTS = POINTS.PROOF_OF_WORK_APPROVED;
 const MAX_FILE_SIZE_MB = 2;
 
 // ─── Types ──────────────────────────────────────────────────

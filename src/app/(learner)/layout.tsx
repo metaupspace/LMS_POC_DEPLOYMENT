@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ProtectedRoute } from '@/components/shared';
 import NotificationBell from '@/components/shared/NotificationBell';
-import PWAInstallPrompt from '@/components/shared/PWAInstallPrompt';
+// import PWAInstallPrompt from '@/components/shared/PWAInstallPrompt';
 import { BottomNavLearner } from '@/components/learner';
 import SideNav from '@/components/shared/SideNav';
 import { ToastContainer } from '@/components/ui';
@@ -71,7 +71,7 @@ export default function LearnerLayout({ children }: { children: React.ReactNode 
 
         {/* Bottom nav — hidden on desktop */}
         <BottomNavLearner className="lg:hidden" />
-        <PWAInstallPrompt />
+        {/* <PWAInstallPrompt /> */}
         <ToastContainer />
       </div>
     </ProtectedRoute>

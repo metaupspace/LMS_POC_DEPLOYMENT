@@ -5,7 +5,6 @@ import { withAuth } from '@/lib/auth/rbac';
 import { createSessionSchema } from '@/lib/validators/session';
 import { successResponse, errorResponse, paginatedResponse } from '@/lib/utils/apiResponse';
 import { getPaginationParams, buildPaginationMeta } from '@/lib/utils/pagination';
-import { syncAllSessionStatuses } from '@/lib/utils/syncSessionStatus';
 import type { FilterQuery } from 'mongoose';
 import type { ITrainingSession } from '@/types';
 
@@ -15,8 +14,7 @@ export const GET = withAuth(
     try {
       await connectDB();
 
-      // Sync stale statuses before querying
-      await syncAllSessionStatuses();
+      // Session status sync is handled by the cron job — no inline sync needed
 
       const { searchParams } = new URL(request.url);
       const { page, limit, search, sortBy, sortOrder } = getPaginationParams(searchParams);

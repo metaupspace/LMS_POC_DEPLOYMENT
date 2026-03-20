@@ -5,6 +5,7 @@ import LearnerProgress from '@/lib/db/models/LearnerProgress';
 import Gamification from '@/lib/db/models/Gamification';
 import { withAuth } from '@/lib/auth/rbac';
 import { successResponse, errorResponse } from '@/lib/utils/apiResponse';
+import { redisGet, redisSet } from '@/lib/redis/client';
 
 // Helper to extract string ID from a populated or raw ObjectId field
 function extractId(field: unknown): string | undefined {
@@ -21,6 +22,11 @@ export const GET = withAuth(
     try {
       await connectDB();
       const { id: courseId } = await context.params;
+
+      // Check cache first
+      const cacheKey = `course-analytics:${courseId}`;
+      const cached = await redisGet(cacheKey);
+      if (cached) return successResponse(cached);
 
       const course = await Course.findById(courseId)
         .populate('assignedStaff', 'name empId email domain location')
@@ -177,7 +183,7 @@ export const GET = withAuth(
         };
       });
 
-      return successResponse({
+      const analyticsResult = {
         courseId,
         courseSummary: {
           totalLearners: totalStaff,
@@ -192,7 +198,12 @@ export const GET = withAuth(
         },
         perModuleStats,
         perLearnerStats,
-      });
+      };
+
+      // Cache for 2 minutes
+      await redisSet(cacheKey, analyticsResult, 120).catch(() => {});
+
+      return successResponse(analyticsResult);
     } catch (err) {
       console.error(
         '[CourseAnalytics/GET] Error:',

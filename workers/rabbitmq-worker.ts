@@ -12,6 +12,7 @@ import 'dotenv/config';
 import amqplib, { type Channel, type ConsumeMessage } from 'amqplib';
 import mongoose from 'mongoose';
 import nodemailer from 'nodemailer';
+import Redis from 'ioredis';
 
 // ---------------------------------------------------------------------------
 // Environment
@@ -19,6 +20,7 @@ import nodemailer from 'nodemailer';
 
 const RABBITMQ_URL = process.env.RABBITMQ_URL!;
 const MONGODB_URI = process.env.MONGODB_URI!;
+const REDIS_URL = process.env.REDIS_URL;
 
 const EMAIL_QUEUE = 'email_queue';
 const NOTIFICATION_QUEUE = 'notification_queue';
@@ -27,6 +29,20 @@ const MAX_RETRIES = 3;
 // ---------------------------------------------------------------------------
 // Email Transporter
 // ---------------------------------------------------------------------------
+
+// Redis client for cache invalidation (lazy init, optional)
+let redisClient: Redis | null = null;
+function getRedis(): Redis | null {
+  if (redisClient) return redisClient;
+  if (!REDIS_URL) return null;
+  try {
+    redisClient = new Redis(REDIS_URL, { maxRetriesPerRequest: 3 });
+    redisClient.on('error', () => {}); // suppress connection errors
+    return redisClient;
+  } catch {
+    return null;
+  }
+}
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
@@ -602,6 +618,11 @@ async function handleNotificationMessage(msg: ConsumeMessage, channel: Channel):
       type: content.type,
       metadata: content.metadata ?? {},
     });
+
+    // Invalidate unread count cache
+    try {
+      await getRedis()?.del(`notifications:unread:${content.userId}`);
+    } catch { /* non-critical */ }
 
     console.info(`[Worker] Notification created for user: ${content.userId}`);
     channel.ack(msg);

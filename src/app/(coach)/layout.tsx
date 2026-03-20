@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { ProtectedRoute } from '@/components/shared';
 import NotificationBell from '@/components/shared/NotificationBell';
-import PWAInstallPrompt from '@/components/shared/PWAInstallPrompt';
+// import PWAInstallPrompt from '@/components/shared/PWAInstallPrompt';
 import { BottomNav } from '@/components/coach';
 import SideNav from '@/components/shared/SideNav';
 import { ToastContainer } from '@/components/ui';
@@ -54,7 +54,7 @@ export default function CoachLayout({ children }: { children: React.ReactNode })
 
         {/* Bottom nav — hidden on desktop */}
         <BottomNav className="lg:hidden" />
-        <PWAInstallPrompt />
+        {/* <PWAInstallPrompt /> */}
         <ToastContainer />
       </div>
     </ProtectedRoute>

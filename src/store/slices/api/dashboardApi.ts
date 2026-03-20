@@ -33,7 +33,14 @@ export const dashboardApi = baseApi.injectEndpoints({
       query: () => '/dashboard/stats',
       providesTags: ['User', 'Course', 'Session', 'Test', 'Certification'],
     }),
+    getRecentActivities: builder.query<ApiResponse<{ activities: unknown[]; pagination: { page: number; limit: number; total: number; hasMore: boolean; totalPages: number } }>, { page?: number; limit?: number } | void>({
+      query: (params) => {
+        const page = params?.page || 1;
+        const limit = params?.limit || 10;
+        return `/admin/recent-activities?page=${page}&limit=${limit}`;
+      },
+    }),
   }),
 });
 
-export const { useGetDashboardStatsQuery } = dashboardApi;
+export const { useGetDashboardStatsQuery, useGetRecentActivitiesQuery } = dashboardApi;
