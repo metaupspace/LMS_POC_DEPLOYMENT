@@ -20,7 +20,10 @@
       "Bash(grep -n \"auto.*complete\\\\|setTimeout\\\\|completeContent\\\\|setCompletedContents\\\\|mark.*read\" /Users/CTO/Downloads/LMS-PSIPL/lms-platform/src/app/\\\\\\(learner\\\\\\)/learner/learning/module/\\\\[id\\\\]/page.tsx)",
       "Bash(grep -n \"useEffect\\\\|completedContents\" /Users/CTO/Downloads/LMS-PSIPL/lms-platform/src/app/\\\\\\(learner\\\\\\)/learner/learning/module/\\\\[id\\\\]/page.tsx | head -20)",
       "Bash(grep -n \"animate\\\\|keyframes\\\\|spin\" /Users/CTO/Downloads/LMS-PSIPL/lms-platform/src/app/\\\\\\(learner\\\\\\)/learner/learning/module/\\\\[id\\\\]/page.tsx)",
-      "Bash(grep -n \"phase === \\\\|ViewPhase\\\\|'content'\" /Users/CTO/Downloads/LMS-PSIPL/lms-platform/src/app/\\\\\\(learner\\\\\\)/learner/learning/module/\\\\[id\\\\]/page.tsx | head -30)"
+      "Bash(grep -n \"phase === \\\\|ViewPhase\\\\|'content'\" /Users/CTO/Downloads/LMS-PSIPL/lms-platform/src/app/\\\\\\(learner\\\\\\)/learner/learning/module/\\\\[id\\\\]/page.tsx | head -30)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //f //im node.exe)",
+      "Bash(curl:*)"
     ]
   }
 }

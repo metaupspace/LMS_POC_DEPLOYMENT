@@ -16,6 +16,7 @@ export const createCourseSchema = z.object({
   proofOfWorkEnabled: z.boolean().optional().default(false),
   proofOfWorkInstructions: z.string().optional().default(''),
   proofOfWorkMandatory: z.boolean().optional().default(false),
+  downloadAllowed: z.boolean().optional().default(true),
   passingThreshold: z.number().min(0).max(100).optional().default(70),
   status: z.enum(['draft', 'active']).optional().default('draft'),
 });
@@ -30,6 +31,7 @@ export const updateCourseSchema = z.object({
   proofOfWorkEnabled: z.boolean().optional(),
   proofOfWorkInstructions: z.string().optional(),
   proofOfWorkMandatory: z.boolean().optional(),
+  downloadAllowed: z.boolean().optional(),
   passingThreshold: z.number().min(0).max(100).optional(),
 });
 

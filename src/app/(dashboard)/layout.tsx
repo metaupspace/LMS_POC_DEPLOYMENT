@@ -4,6 +4,7 @@ import { useAppSelector } from '@/store/hooks';
 import { Sidebar, TopBar } from '@/components/dashboard';
 import { ProtectedRoute } from '@/components/shared';
 import { ToastContainer } from '@/components/ui';
+import ConnectionStatus from '@/components/shared/ConnectionStatus';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const sidebarOpen = useAppSelector((s) => s.ui.sidebarOpen);
@@ -13,6 +14,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="min-h-screen bg-surface-background">
         <TopBar />
         <Sidebar />
+        <ConnectionStatus />
 
         {/* Main content */}
         <main

@@ -66,6 +66,7 @@ export interface ICourse extends Document {
   proofOfWorkEnabled: boolean;
   proofOfWorkInstructions: string;
   proofOfWorkMandatory: boolean;
+  downloadAllowed: boolean;
   passingThreshold: number;
   createdBy: Types.ObjectId;
   createdAt: Date;

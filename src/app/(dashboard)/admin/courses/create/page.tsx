@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 
+import RichTextEditor from '@/components/ui/RichTextEditor';
 import {
   Button,
   Card,
@@ -81,6 +82,7 @@ interface CourseFormData {
   passingThreshold: number;
   thumbnail: string;
   thumbnailFileName: string;
+  downloadAllowed: boolean;
 }
 
 interface ProofOfWorkFormData {
@@ -187,6 +189,7 @@ export default function CreateCoursePage() {
     passingThreshold: 70,
     thumbnail: '',
     thumbnailFileName: '',
+    downloadAllowed: true,
   });
 
   const [modules, setModules] = useState<ModuleFormData[]>([]);
@@ -225,6 +228,7 @@ export default function CreateCoursePage() {
         passingThreshold: c.passingThreshold ?? 70,
         thumbnail: c.thumbnail || '',
         thumbnailFileName: c.thumbnail ? 'existing-thumbnail' : '',
+        downloadAllowed: c.downloadAllowed ?? true,
       });
       setProofOfWork({
         enabled: c.proofOfWorkEnabled ?? false,
@@ -619,6 +623,7 @@ export default function CreateCoursePage() {
               proofOfWorkEnabled: proofOfWork.enabled,
               proofOfWorkInstructions: proofOfWork.instructions || undefined,
               proofOfWorkMandatory: proofOfWork.mandatory,
+              downloadAllowed: courseData.downloadAllowed,
               passingThreshold: courseData.passingThreshold,
               status: publish ? 'active' : 'draft',
             },
@@ -635,6 +640,7 @@ export default function CreateCoursePage() {
             proofOfWorkEnabled: proofOfWork.enabled,
             proofOfWorkInstructions: proofOfWork.instructions || undefined,
             proofOfWorkMandatory: proofOfWork.mandatory,
+            downloadAllowed: courseData.downloadAllowed,
             passingThreshold: courseData.passingThreshold,
             status: publish ? 'active' : 'draft',
           }).unwrap();
@@ -658,7 +664,7 @@ export default function CreateCoursePage() {
                 title: c.title,
                 data: c.data,
                 duration: c.duration,
-                downloadable: false,
+                downloadable: c.type === 'video' && courseData.downloadAllowed,
               })),
             }).unwrap();
 
@@ -868,6 +874,25 @@ export default function CreateCoursePage() {
                 error={isUploading ? 'Uploading...' : undefined}
               />
             </div>
+
+            {/* Allow Video Downloads Toggle */}
+            <div className="flex items-center justify-between rounded-md border border-border-light px-md py-md">
+              <div>
+                <p className="text-body-md font-medium text-text-primary">Allow Video Downloads</p>
+                <p className="text-caption text-text-secondary">Learners can download videos for offline viewing</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={courseData.downloadAllowed}
+                  onChange={(e) =>
+                    setCourseData((prev) => ({ ...prev, downloadAllowed: e.target.checked }))
+                  }
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:ring-2 peer-focus:ring-primary-main/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-main" />
+              </label>
+            </div>
           </div>
         )}
 
@@ -1062,22 +1087,27 @@ export default function CreateCoursePage() {
                             </div>
                           ) : (
                             <div className="mt-sm">
-                              <Input
-                                label="Text Content"
-                                value={content.data}
-                                onChange={(e) =>
+                              <label className="block text-body-md font-medium text-text-primary mb-xs">
+                                Text Content
+                              </label>
+                              <RichTextEditor
+                                content={content.data}
+                                onChange={(html) =>
                                   updateContent(
                                     mod.id,
                                     content.id,
                                     'data',
-                                    e.target.value
+                                    html
                                   )
                                 }
-                                placeholder="Enter text content"
-                                error={
-                                  errors[`module-${mi}-content-${ci}-data`]
-                                }
+                                placeholder="Write your lesson content here..."
+                                minHeight="250px"
                               />
+                              {errors[`module-${mi}-content-${ci}-data`] && (
+                                <p className="text-error text-caption mt-1">
+                                  {errors[`module-${mi}-content-${ci}-data`]}
+                                </p>
+                              )}
                             </div>
                           )}
                           <div className="mt-sm">

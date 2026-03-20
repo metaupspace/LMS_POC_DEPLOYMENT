@@ -35,6 +35,7 @@ export interface CourseData {
   proofOfWorkEnabled: boolean;
   proofOfWorkInstructions: string;
   proofOfWorkMandatory: boolean;
+  downloadAllowed: boolean;
   passingThreshold: number;
   createdBy: string;
   createdAt: string;
@@ -93,6 +94,7 @@ export interface CreateCourseBody {
   proofOfWorkEnabled?: boolean;
   proofOfWorkInstructions?: string;
   proofOfWorkMandatory?: boolean;
+  downloadAllowed?: boolean;
   passingThreshold?: number;
   status?: 'draft' | 'active';
 }
@@ -107,6 +109,7 @@ export interface UpdateCourseBody {
   proofOfWorkEnabled?: boolean;
   proofOfWorkInstructions?: string;
   proofOfWorkMandatory?: boolean;
+  downloadAllowed?: boolean;
   passingThreshold?: number;
 }
 

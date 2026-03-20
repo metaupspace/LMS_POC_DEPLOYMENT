@@ -58,6 +58,10 @@ const courseSchema = new Schema<ICourse>(
       type: Boolean,
       default: false,
     },
+    downloadAllowed: {
+      type: Boolean,
+      default: true,
+    },
     passingThreshold: {
       type: Number,
       default: 70,

@@ -7,6 +7,7 @@ import PWAInstallPrompt from '@/components/shared/PWAInstallPrompt';
 import { BottomNav } from '@/components/coach';
 import SideNav from '@/components/shared/SideNav';
 import { ToastContainer } from '@/components/ui';
+import ConnectionStatus from '@/components/shared/ConnectionStatus';
 import { useAppSelector } from '@/store/hooks';
 
 const coachNavItems = [
@@ -36,6 +37,8 @@ export default function CoachLayout({ children }: { children: React.ReactNode })
             <NotificationBell iconClassName="text-white font-bold" />
           </div>
         </header>
+
+        <ConnectionStatus />
 
         <div className="flex pt-[56px]">
           {/* Desktop: Side navigation */}

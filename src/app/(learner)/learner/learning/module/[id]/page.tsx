@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { VideoPlayer, Card, Button, FileUpload } from '@/components/ui';
 import TextContentViewer from '@/components/learner/TextContentViewer';
+import VideoDownloadButton from '@/components/learner/VideoDownloadButton';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { addToast } from '@/store/slices/uiSlice';
 import {
@@ -139,9 +140,12 @@ interface VideoContentViewProps {
   content: ModuleContentData;
   onComplete: () => void;
   isCompleted: boolean;
+  downloadAllowed?: boolean;
+  moduleTitle?: string;
+  courseTitle?: string;
 }
 
-function VideoContentView({ content, onComplete, isCompleted }: VideoContentViewProps) {
+function VideoContentView({ content, onComplete, isCompleted, downloadAllowed, moduleTitle, courseTitle }: VideoContentViewProps) {
   const [videoProgress, setVideoProgress] = useState(0);
   const completedRef = useRef(isCompleted);
 
@@ -198,6 +202,15 @@ function VideoContentView({ content, onComplete, isCompleted }: VideoContentView
             Mark as watched
           </button>
         </div>
+      )}
+
+      {/* Download button */}
+      {downloadAllowed && content.downloadable && (
+        <VideoDownloadButton
+          videoUrl={content.data}
+          title={`${courseTitle || 'Video'} - ${moduleTitle || 'Module'} - ${content.title || 'Content'}`}
+          className="mt-sm"
+        />
       )}
     </div>
   );
@@ -1134,6 +1147,8 @@ interface ReviewPhaseProps {
   quizMeta: { questionCount: number; passingScore: number; maxAttempts: number } | null;
   maxPoints: number;
   onBackToCourse: () => void;
+  downloadAllowed?: boolean;
+  courseTitle?: string;
 }
 
 function ReviewPhase({
@@ -1144,6 +1159,8 @@ function ReviewPhase({
   quizMeta,
   maxPoints,
   onBackToCourse,
+  downloadAllowed,
+  courseTitle,
 }: ReviewPhaseProps) {
   const [expandedContent, setExpandedContent] = useState<number | null>(null);
 
@@ -1215,12 +1232,20 @@ function ReviewPhase({
             {expandedContent === idx && (
               <div className="border-t border-border-light p-md">
                 {content.type === 'video' ? (
-                  <VideoPlayer
-                    src={content.data}
-                    hlsUrl={content.hlsUrl}
-                    title={content.title}
-                    downloadable={content.downloadable}
-                  />
+                  <div className="space-y-sm">
+                    <VideoPlayer
+                      src={content.data}
+                      hlsUrl={content.hlsUrl}
+                      title={content.title}
+                      downloadable={content.downloadable}
+                    />
+                    {downloadAllowed && content.downloadable && (
+                      <VideoDownloadButton
+                        videoUrl={content.data}
+                        title={`${courseTitle || 'Video'} - ${moduleTitle || 'Module'} - ${content.title || 'Content'}`}
+                      />
+                    )}
+                  </div>
                 ) : (
                   <div className="prose prose-sm max-w-none text-body-md text-text-primary leading-relaxed whitespace-pre-wrap">
                     {content.data}
@@ -1568,6 +1593,8 @@ export default function ModuleContentViewer() {
           quizMeta={quizMeta}
           maxPoints={moduleMaxPoints}
           onBackToCourse={handleBackToCourse}
+          downloadAllowed={course?.downloadAllowed !== false}
+          courseTitle={course?.title}
         />
       )}
 
@@ -1581,6 +1608,9 @@ export default function ModuleContentViewer() {
                   content={currentContent}
                   onComplete={() => handleContentComplete(currentContentIndex)}
                   isCompleted={isCurrentContentCompleted}
+                  downloadAllowed={course?.downloadAllowed !== false}
+                  moduleTitle={moduleData?.title}
+                  courseTitle={course?.title}
                 />
               ) : (
                 <TextContentViewer

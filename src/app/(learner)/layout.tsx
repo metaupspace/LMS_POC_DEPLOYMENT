@@ -8,6 +8,7 @@ import PWAInstallPrompt from '@/components/shared/PWAInstallPrompt';
 import { BottomNavLearner } from '@/components/learner';
 import SideNav from '@/components/shared/SideNav';
 import { ToastContainer } from '@/components/ui';
+import ConnectionStatus from '@/components/shared/ConnectionStatus';
 import { useAppSelector } from '@/store/hooks';
 
 const learnerNavItems = [
@@ -53,6 +54,8 @@ export default function LearnerLayout({ children }: { children: React.ReactNode 
             <NotificationBell iconClassName="text-white" />
           </div>
         </header>
+
+        <ConnectionStatus />
 
         <div className="flex pt-[56px]">
           {/* Desktop: Side navigation */}
